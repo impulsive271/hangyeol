@@ -1,0 +1,469 @@
+/* --- 1. <한결> "미래형 오로라" 테마 --- */
+
+:root {
+  /* 1a. 색상 팔레트 (Purple/Indigo 중심) */
+  --color-dark-bg: #0b091a; /* 아주 어두운 남색 배경 */
+  --color-card-bg: rgba(26, 22, 54, 0.6); /* 반투명 카드 배경 (유리 질감) */
+  --color-card-border: rgba(124, 58, 237, 0.3); /* 카드 테두리 (보라) */
+  --color-card-hover-border: rgba(168, 85, 247, 0.8); /* 카드 호버 테두리 */
+  
+  --color-primary: #a855f7; /* 메인 퍼플 */
+  --color-secondary: #6366f1; /* 보조 인디고 */
+  --color-text: #e2e8f0; /* 기본 텍스트 (밝은 회색) */
+  --color-text-muted: #94a3b8; /* 흐린 텍스트 */
+
+  /* 1b. 그라데이션 정의 */
+  --gradient-primary: linear-gradient(135deg, var(--color-secondary), var(--color-primary));
+  --gradient-text: linear-gradient(135deg, #c084fc, #818cf8); /* 텍스트용 그라데이션 */
+  
+  /* 1c. 그림자 및 효과 */
+  --shadow-glow: 0 0 32px 0 rgba(168, 85, 247, 0.25); /* 보라색 빛나는 효과 */
+  --shadow-card: 0 8px 32px 0 rgba(0, 0, 0, 0.3); /* 카드 그림자 (띄우기) */
+  --backdrop-blur: blur(12px); /* 유리 질감(Glassmorphism)을 위한 블러 */
+  --border-radius-lg: 16px;
+}
+
+/* --- 2. 기본 및 폰트 설정 (Pico 오버라이드) --- */
+
+html {
+  /* Pretendard 폰트 *강제* 적용 */
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+}
+
+body.dark-theme {
+  /* 2a. 다크 모드 배경 및 폰트 */
+  background-color: var(--color-dark-bg);
+  color: var(--color-text);
+  
+  /* Pico 기본값 덮어쓰기 */
+  --background-color: var(--color-dark-bg);
+  --color: var(--color-text);
+  --primary: var(--color-primary);
+  --primary-hover: var(--color-secondary);
+  --primary-focus: var(--color-primary);
+  --primary-inverse: #fff;
+  --muted-color: var(--color-text-muted);
+  --muted-border-color: rgba(255, 255, 255, 0.1); /* 테두리 */
+  --card-background-color: var(--color-card-bg);
+  --card-border-color: var(--color-card-border);
+  --card-box-shadow: none; /* Pico 기본 그림자 제거 */
+  --border-radius: var(--border-radius-lg); /* Pico 곡률 덮어쓰기 */
+}
+
+/* 2b. 그라데이션 텍스트 헬퍼 */
+.gradient-text {
+  background: var(--gradient-text);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+  font-weight: 800;
+}
+
+/* --- 3. 헤더 및 내비게이션 --- */
+header nav {
+  background: transparent;
+  border-bottom: 1px solid var(--muted-border-color);
+  padding: 0.5rem 0;
+}
+a.logo strong {
+  font-size: 1.5rem;
+  font-weight: 800;
+  background: var(--gradient-text);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+header nav ul li a {
+  color: var(--color-text-muted);
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+header nav ul li a:hover {
+  color: var(--color-text);
+  background: transparent;
+}
+
+/* --- 4. 메인 페이지 (index.html) --- */
+
+/* 4a. Hero 섹션 */
+.hero {
+  text-align: center;
+  padding: 4rem 0;
+  margin-bottom: 2rem;
+}
+.hero h1 {
+  font-size: 3.5rem;
+  line-height: 1.1;
+  margin-bottom: 1rem;
+}
+.hero p {
+  font-size: 1.25rem;
+  color: var(--color-text-muted);
+  margin-bottom: 2rem;
+}
+
+/* 4b. 그라데이션 버튼 (인터랙티브) */
+.primary-gradient-button {
+  background: var(--gradient-primary);
+  color: #fff;
+  border: none;
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  border-radius: 99px; /* 캡슐 형태 */
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px 0 rgba(168, 85, 247, 0.3);
+}
+.primary-gradient-button:hover {
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: var(--shadow-glow); /* 호버 시 빛나는 효과 */
+  background: var(--gradient-primary); /* Pico 호버 스타일 덮어쓰기 */
+}
+
+/* 4c. "플로팅" 카드 (핵심 요청) */
+.grid {
+  /* 기존 반응형 그리드는 그대로 사용 (좋은 코드!) */
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+}
+
+.card {
+  /* 유리 질감 (Glassmorphism) */
+  background: var(--color-card-bg);
+  backdrop-filter: var(--backdrop-blur);
+  -webkit-backdrop-filter: var(--backdrop-blur);
+  
+  border: 1px solid var(--color-card-border);
+  box-shadow: var(--shadow-card);
+  border-radius: var(--border-radius-lg);
+  padding: 1.5rem;
+  text-decoration: none;
+  
+  /* 인터랙티브 애니메이션 */
+  transition: all 0.3s ease-out;
+}
+
+.card:hover {
+  /* 떠오르는(Floating) 인터랙션 */
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: var(--shadow-glow); /* 호버 시 빛나는 그림자 */
+  border-color: var(--color-card-hover-border);
+  background: var(--color-card-bg); /* Pico 호버 스타일 덮어쓰기 */
+}
+
+.card h3 {
+  color: var(--color-text); /* 제목은 밝게 */
+  margin-bottom: 0.5rem;
+}
+.card p {
+  color: var(--color-text-muted);
+}
+.card.muted {
+  /* 비활성 카드는 더 투명하게 */
+  opacity: 0.6;
+  background: rgba(26, 22, 54, 0.3);
+}
+.card.muted:hover {
+  transform: none;
+  box-shadow: var(--shadow-card);
+  border-color: var(--color-card-border);
+}
+
+
+/* --- 5. 판독기 페이지 (grade.html) --- */
+form {
+  /* 카드와 동일한 유리 질감 적용 */
+  background: var(--color-card-bg);
+  backdrop-filter: var(--backdrop-blur);
+  -webkit-backdrop-filter: var(--backdrop-blur);
+  border: 1px solid var(--color-card-border);
+  box-shadow: var(--shadow-card);
+  border-radius: var(--border-radius-lg);
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+/* 폼 요소 스타일링 */
+form label {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+form textarea {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--muted-border-color);
+  color: var(--color-text);
+  min-height: 100px;
+}
+form textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 10px 0 rgba(168, 85, 247, 0.3);
+}
+
+/* 폼 제출 버튼 (그라데이션 버튼 재사용) */
+form button[type="submit"] {
+  background: var(--gradient-primary);
+  border: none;
+  color: #fff;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px 0 rgba(168, 85, 247, 0.3);
+}
+form button[type="submit"]:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-glow);
+  background: var(--gradient-primary);
+}
+
+/* 판독 결과 영역 */
+.result {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-primary); /* 결과는 강조 */
+  border-radius: var(--border-radius-lg);
+  padding: 1.5rem 2rem;
+}
+.result .grade {
+  font-size: 1.75rem;
+  font-weight: 700;
+  background: var(--gradient-text);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 1rem;
+}
+.result details summary {
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+/* 상세 로그 (어두운 테마) */
+pre.log {
+  background: #02010a; /* 더 어두운 배경 */
+  border: 1px solid var(--muted-border-color);
+  color: #e6edf3;
+  padding: 1rem;
+  border-radius: var(--border-radius-lg);
+  margin-top: 1rem;
+  max-height: 400px;
+  overflow: auto;
+}
+
+/* --- 6. 기타 --- */
+.footer {
+  text-align: center;
+  padding: 2rem 0;
+  margin-top: 2rem;
+  border-top: 1px solid var(--muted-border-color);
+  color: var(--color-text-muted);
+}
+.notice {
+  /* 알림창 스타일 */
+  background: rgba(247, 203, 107, 0.1); /* 노란색 계열 */
+  border: 1px solid rgba(247, 203, 107, 0.5);
+  color: #f7cb6b;
+  padding: 1rem 1.5rem;
+  border-radius: var(--border-radius-lg);
+}
+
+/* --- 7. 반응형 (모바일) --- */
+@media (max-width: 768px) {
+  .hero h1 {
+    font-size: 2.5rem; /* 모바일에서 히어로 텍스트 크기 조정 */
+  }
+  .hero p {
+    font-size: 1rem;
+  }
+  form, .result {
+    padding: 1.5rem; /* 모바일에서 패딩 줄임 */
+  }
+}
+
+/* --- 8. 토글 스위치 (Toggle Switch) 스타일 --- */
+
+.toggle-container {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem; /* 폼 버튼과의 간격 */
+}
+
+.toggle-label {
+  margin-bottom: 0; /* Pico.css의 label 마진 덮어쓰기 */
+  margin-left: 0.75rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+/* 실제 체크박스는 숨김 */
+.toggle-switch input[type="checkbox"] {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+/* 스위치 슬라이더 (배경) */
+.toggle-switch .slider {
+  position: relative;
+  display: block;
+  cursor: pointer;
+  width: 56px; /* 28px * 2 */
+  height: 30px; /* 26px + 4px */
+  background-color: #5a697d; /* 끄기(OFF) 상태 배경 (회색) */
+  border-radius: 30px;
+  transition: background-color 0.3s ease;
+  padding: 2px;
+}
+
+/* 스위치 원 (움직이는 부분) */
+.toggle-switch .slider::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 26px;
+  height: 26px;
+  background-color: white;
+  border-radius: 50%;
+  transition: transform 0.3s ease;
+}
+
+/* ON/OFF 텍스트 스타일 */
+.toggle-switch .slider-text {
+  position: absolute;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: white;
+  top: 50%;
+  transform: translateY(-50%);
+  line-height: 1;
+}
+
+/* OFF 상태일 때 "OFF" 텍스트 */
+.toggle-switch .slider-text::after {
+  content: attr(data-off);
+  right: 8px;
+  display: block;
+}
+
+/* ON 상태일 때 "ON" 텍스트 (기본 숨김) */
+.toggle-switch .slider-text::before {
+  content: attr(data-on);
+  left: 8px;
+  display: none;
+}
+
+
+/* --- 체크됐을 때 (ON) 상태 --- */
+
+.toggle-switch input:checked + .slider {
+  background-color: #34c759; /* 켜기(ON) 상태 배경 (초록색) */
+}
+
+/* 원이 오른쪽으로 이동 */
+.toggle-switch input:checked + .slider::before {
+  transform: translateX(26px);
+}
+
+/* "OFF" 텍스트 숨김 */
+.toggle-switch input:checked + .slider .slider-text::after {
+  display: none;
+}
+
+/* "ON" 텍스트 표시 */
+.toggle-switch input:checked + .slider .slider-text::before {
+  display: block;
+}
+
+/* --- [NEW] 생성 결과 헤더 (문장 + 복사 버튼) --- */
+.result-header {
+  display: flex;
+  justify-content: space-between; /* 양쪽 끝으로 정렬 */
+  align-items: center;
+  gap: 1rem; /* 문장과 버튼 사이 간격 */
+  margin-bottom: 1rem; /* 상세 로그와의 간격 */
+}
+
+.result-header .grade {
+  margin-bottom: 0; /* <p> 태그의 기본 마진 제거 */
+}
+
+/* 3. 퀴즈 스타일 (이 코드로 교체해 주세요) */
+  .quiz-container {
+    text-align: center;
+    border: 1px solid var(--muted-border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-top: 1rem;
+  }
+  
+  /* [NEW] 선택형 박스 퀴즈 스타일 */
+  .quiz-question-box {
+    font-size: 1.25rem;
+    margin-bottom: 2rem;
+    line-height: 2.5; /* 줄 간격 확보 */
+    display: flex; /* 가로 정렬 */
+    flex-wrap: wrap; /* 모바일에서 줄바꿈 허용 */
+    justify-content: center; /* 중앙 정렬 */
+    align-items: center;
+    gap: 0.5rem; /* 요소 사이 간격 */
+  }
+
+  /* "저는", "보다" 같은 일반 텍스트 */
+  .quiz-text {
+    margin: 0 0.25rem;
+  }
+  
+  /* '/' 구분자 */
+  .quiz-divider {
+    color: var(--color-text-muted);
+  }
+
+  /* 선택지 그룹 */
+  .quiz-box-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  /* [핵심] 실제 라디오 버튼 숨기기 */
+  .quiz-box-group input[type="radio"] {
+    display: none;
+  }
+
+  /* [핵심] 클릭 가능한 네모 박스 (label) */
+  .quiz-box {
+    border: 2px solid var(--muted-border-color); /* 기본 테두리 */
+    background: rgba(0,0,0,0.2);
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-weight: 600;
+  }
+
+  /* 마우스 올렸을 때 */
+  .quiz-box:hover {
+    border-color: var(--color-text-muted);
+    background: rgba(0,0,0,0.4);
+  }
+
+  /* [핵심] 선택됐을 때 (보라색 테두리) */
+  .quiz-box-group input[type="radio"]:checked + .quiz-box {
+    border-color: var(--color-primary); /* 보라색 테두리 */
+    background: var(--color-card-bg);
+    color: var(--color-primary);
+    box-shadow: 0 0 10px 0 rgba(168, 85, 247, 0.3); /* 보라색 빛 */
+  }
+  
+  /* 4. 퀴즈 피드백 (이 부분은 기존과 동일) */
+  .quiz-feedback-area {
+    margin-top: 1rem;
+    font-weight: 600;
+  }
+  .feedback-correct {
+    color: #34c759; /* 초록색 */
+  }
+  .feedback-incorrect {
+    color: #ff453a; /* 빨간색 */
+  }
