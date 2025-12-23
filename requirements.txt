@@ -1,7 +1,7 @@
-flask
-pandas
-google-genai
-python-dotenv
-kiwipiepy
-openpyxl
-# io, os, re, json 등은 Python 표준 라이브러리이므로 명시적으로 포함하지 않습니다.
+Flask==3.0.3
+kiwipiepy==0.20.0
+pandas==2.2.2
+numpy==2.0.2
+gunicorn==21.2.0
+requests==2.31.0
+
