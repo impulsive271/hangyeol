@@ -1,0 +1,87 @@
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+  <h4 style="margin: 0; font-weight: 700; color: #ccc;">📊 상세 분석 결과</h4>
+  <button type="button" class="outline contrast" onclick="copyTableText()" style="padding: 6px 16px; font-size: 0.85rem; margin-bottom: 0;">
+    📋 텍스트로 복사
+  </button>
+</div>
+
+<div class="table-container">
+  <table id="analysis-table" class="striped">
+    <thead>
+      <tr>
+        <th scope="col" style="width: 15%;">표제어</th>
+        <th scope="col" style="width: 20%;">품사</th>
+        <th scope="col" style="width: 10%;">등급</th>
+        <th scope="col" style="width: 15%;">번호</th>
+        <th scope="col">길잡이말</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in analysis_result %}
+      <tr>
+        <td style="font-weight: bold; color: var(--color-text);">{{ row.form }}</td>
+        <td>
+          <span data-tooltip="{{ row.tag_code }}" style="border-bottom: 1px dotted #888; cursor: help;">
+            {{ row.tag_name }}
+          </span>
+        </td>
+        <td>
+          {% if '급' in row.level %}
+            <span class="grade-badge grade-{{ row.level[0] }}" style="font-size: 1rem; padding: 4px 12px;">
+              {{ row.level }}
+            </span>
+          {% else %}
+            <span style="color: var(--color-text-muted);">-</span>
+          {% endif %}
+        </td>
+        <td style="font-family: monospace; font-size: 0.95rem; color: var(--color-text-muted);">
+          {{ row.id }}
+        </td>
+        <td style="color: var(--color-secondary);">
+          {{ row.desc }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<style>
+  .table-container { overflow-x: auto; border: 1px solid var(--muted-border-color); border-radius: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 1.05rem; }
+  th { background-color: rgba(255, 255, 255, 0.05); text-align: left; font-weight: 600; padding: 14px; }
+  td { padding: 14px; border-bottom: 1px solid var(--muted-border-color); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  
+  /* 오리지널 등급 색상 복원 */
+  .grade-badge { display: inline-block; border-radius: 12px; color: #fff; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+  .grade-1 { background-color: #10b981; } /* 초록 */
+  .grade-2 { background-color: #3b82f6; } /* 파랑 */
+  .grade-3 { background-color: #8b5cf6; } /* 보라 */
+  .grade-4 { background-color: #f59e0b; } /* 노랑 */
+  .grade-5 { background-color: #ef4444; } /* 빨강 */
+  .grade-6 { background-color: #64748b; } /* 회색 */
+</style>
+
+<script>
+  function copyTableText() {
+    const table = document.getElementById('analysis-table');
+    if (!table) return;
+    let textToCopy = "";
+    
+    // 헤더
+    const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText);
+    textToCopy += headers.join('\t') + '\n';
+    
+    // 본문
+    const rows = table.querySelectorAll('tbody tr');
+    rows.forEach(row => {
+      const cells = Array.from(row.querySelectorAll('td')).map(td => td.innerText.replace(/[\r\n]+/g, " ").trim());
+      textToCopy += cells.join('\t') + '\n';
+    });
+
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      alert('텍스트가 복사되었습니다! 엑셀에 붙여넣기 좋습니다.');
+    });
+  }
+</script>

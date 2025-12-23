@@ -1,0 +1,338 @@
+{% extends 'base.html' %}
+{% block content %}
+<section>
+  <h2>✨ 유형별 문제 생성기</h2>
+  <p>원하는 유형을 선택하고 조건을 입력하면 AI가 문제를 만듭니다.</p>
+
+  <form onsubmit="return false;" class="form mt-4">
+    
+    <fieldset>
+      <legend>1. 기본 설정</legend>
+      
+      <label>문제 유형</label>
+      <div class="grid mb-4" style="grid-template-columns: 1fr 1fr;">
+        <label class="radio-card">
+          <input type="radio" name="quiz_type" value="binary" checked onchange="toggleInputSection()">
+          <span class="radio-title">⚖️ 둘 중 하나 고르기</span>
+          <span class="radio-desc">이것 / 그것 (문맥 파악)</span>
+        </label>
+        
+        <label class="radio-card">
+          <input type="radio" name="quiz_type" value="matching" onchange="toggleInputSection()">
+          <span class="radio-title">🔗 단어와 뜻 짝짓기</span>
+          <span class="radio-desc">선 잇기 게임 (어휘 학습)</span>
+        </label>
+      </div>
+
+      <label>목표 등급</label>
+      <div class="grade-grid mb-2">
+        <label><input type="checkbox" name="grades" value="1" checked> 1급</label>
+        <label><input type="checkbox" name="grades" value="2"> 2급</label>
+        <label><input type="checkbox" name="grades" value="3"> 3급</label>
+        <label><input type="checkbox" name="grades" value="4"> 4급</label>
+        <label><input type="checkbox" name="grades" value="5"> 5급</label>
+        <label><input type="checkbox" name="grades" value="6"> 6급</label>
+      </div>
+    </fieldset>
+
+    <fieldset id="section-common-target">
+      <legend>2. 출제 대상 선택 (단어/문법)</legend>
+      <div class="mode-toggle">
+        <input type="radio" class="btn-check" name="input_mode" id="mode-search" value="search" checked onchange="toggleMode()">
+        <label class="mode-btn" for="mode-search">🔍 검색</label>
+
+        <input type="radio" class="btn-check" name="input_mode" id="mode-sentence" value="sentence" onchange="toggleMode()">
+        <label class="mode-btn" for="mode-sentence">📝 문장 분석</label>
+      </div>
+
+      <div id="section-search" class="mt-4 search-wrapper">
+        {% include 'components/search_bar.html' %}
+      </div>
+
+      <div id="section-sentence" class="mt-4" style="display: none;">
+        <div class="input-group">
+          <textarea id="sentence-input" rows="2" placeholder="예: 나는 한국 음식이 좋아요"></textarea>
+          <button type="button" class="secondary" onclick="analyzeSentence()" style="width: auto; margin-bottom: 0;">분석</button>
+        </div>
+        <div id="morpheme-area" class="morpheme-container mt-3" style="display: none;">
+          <div id="morpheme-chips" class="chip-wrapper"></div>
+        </div>
+      </div>
+
+      <div class="selected-target-display mt-4">
+        <span>선택됨:</span>
+        <strong id="display-target" class="gradient-text">없음</strong>
+        <input type="hidden" id="final-target-value"> 
+        <input type="hidden" id="final-context-value">
+      </div>
+    </fieldset>
+
+    <fieldset id="section-matching-target" style="display: none;">
+      <legend>2. 짝짓기 단어 입력</legend>
+      <p class="small-desc" style="color:#aaa; margin-bottom:15px;">
+        💡 단어를 1개만 입력해도 나머지는 AI가 비슷한 주제로 채워줍니다! (최대 3개)
+      </p>
+      <div class="input-group mb-2">
+        <input type="text" class="matching-word-input" placeholder="단어 1 (예: 사과)">
+      </div>
+      <div class="input-group mb-2">
+        <input type="text" class="matching-word-input" placeholder="단어 2 (선택)">
+      </div>
+      <div class="input-group mb-2">
+        <input type="text" class="matching-word-input" placeholder="단어 3 (선택)">
+      </div>
+    </fieldset>
+
+    <fieldset class="mt-4">
+      <legend>3. 추가 요청 (선택)</legend>
+      <div class="input-group">
+        <textarea id="user-prompt" rows="2" placeholder="예: 아주 쉽게 설명해줘, 예문을 포함해줘..."></textarea>
+      </div>
+    </fieldset>
+
+    <button type="button" class="primary-gradient-button" onclick="generateQuiz()" style="margin-top: 20px;">
+      ✨ 문제 생성하기
+    </button>
+  </form>
+
+  <div id="quiz-result-area" style="display: none; margin-top: 40px;">
+    </div>
+</section>
+
+<style>
+  /* 짝짓기 게임용 스타일 */
+  .matching-game-container {
+      position: relative; width: 100%; min-height: 400px;
+      display: flex; justify-content: space-between; padding: 20px;
+      background: #1a1a2e; border-radius: 12px; border: 1px solid #444;
+      user-select: none;
+  }
+  .svg-layer {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none; z-index: 10;
+  }
+  .column {
+      display: flex; flex-direction: column; justify-content: space-around;
+      width: 40%; z-index: 20;
+  }
+  .item-card {
+      background: #2a2a3e; border: 2px solid #555; border-radius: 8px;
+      padding: 15px; margin: 10px 0; color: white; text-align: center;
+      cursor: pointer; position: relative; transition: 0.2s;
+  }
+  .item-card:hover { border-color: #3b82f6; background: #333; }
+  .item-card.connected { border-color: #22c55e; background: rgba(34, 197, 94, 0.1); }
+  
+  .dot {
+      width: 10px; height: 10px; background: #888; border-radius: 50%;
+      position: absolute; top: 50%; transform: translateY(-50%);
+  }
+  .left .dot { right: -6px; }
+  .right .dot { left: -6px; }
+
+  /* 기존 스타일들 */
+  .grade-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+  .grade-grid label { display: flex; align-items: center; background: rgba(255,255,255,0.05); padding: 8px 16px; border-radius: 20px; border: 1px solid #444; cursor: pointer; }
+  .grade-grid input { margin-right: 8px; }
+  
+  .radio-card { display: flex; flex-direction: column; background: rgba(255,255,255,0.05); border: 1px solid #444; padding: 1rem; border-radius: 12px; cursor: pointer; transition: 0.2s; }
+  .radio-card input:checked + .radio-title { color: #a855f7; }
+  
+  .mode-toggle { display: flex; gap: 10px; background: #111; padding: 5px; border-radius: 50px; margin-bottom: 1rem; }
+  .mode-btn { flex: 1; text-align: center; padding: 10px; border-radius: 50px; cursor: pointer; border: 1px solid #333; color: #888; }
+  .btn-check:checked + .mode-btn { background: var(--brand-gradient); color: white; font-weight: bold; }
+  .morph-chip { background: #333; color: #ccc; border: 1px solid #555; padding: 8px 16px; border-radius: 8px; cursor: pointer; margin: 4px; display:inline-block;}
+  .morph-chip.selected { background: var(--brand-gradient); color: white; }
+
+  .quiz-opt-btn { width: 100%; padding: 15px; margin-bottom: 10px; border: 2px solid #555; background: transparent; color: white; border-radius: 12px; text-align: left; cursor: pointer; }
+  .quiz-opt-btn.correct { background: #10b981; border-color: #10b981; }
+  .quiz-opt-btn.wrong { background: #ef4444; border-color: #ef4444; }
+</style>
+
+<script src="{{ url_for('static', filename='js/matching_quiz.js') }}"></script>
+<script src="{{ url_for('static', filename='search.js') }}"></script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    toggleInputSection(); 
+  });
+
+  function toggleInputSection() {
+    const quizType = document.querySelector('input[name="quiz_type"]:checked').value;
+    const commonSection = document.getElementById('section-common-target');
+    const matchingSection = document.getElementById('section-matching-target');
+
+    if (quizType === 'matching') {
+      commonSection.style.display = 'none';
+      matchingSection.style.display = 'block';
+    } else {
+      commonSection.style.display = 'block';
+      matchingSection.style.display = 'none';
+    }
+    
+    document.getElementById('quiz-result-area').style.display = 'none';
+  }
+
+  function toggleMode() {
+    const isSearch = document.getElementById('mode-search').checked;
+    document.getElementById('section-search').style.display = isSearch ? 'block' : 'none';
+    document.getElementById('section-sentence').style.display = isSearch ? 'none' : 'block';
+    resetSelection();
+  }
+  
+  function resetSelection() {
+    document.getElementById('final-target-value').value = '';
+    document.getElementById('display-target').innerText = '없음';
+    document.getElementById('morpheme-area').style.display = 'none';
+  }
+
+  function selectTarget(display, val, context) {
+    document.getElementById('final-target-value').value = val;
+    document.getElementById('final-context-value').value = context || '';
+    document.getElementById('display-target').innerText = display;
+  }
+
+  initSearchModule(function(item) {
+    const display = `${item.text} [${item.pos}]`;
+    const val = `${item.text} (${item.pos})`;
+    selectTarget(display, val, item.desc);
+    document.getElementById('common-search-results').style.display = 'none';
+    document.getElementById('common-search-input').value = '';
+  });
+
+  async function analyzeSentence() {
+    const text = document.getElementById('sentence-input').value;
+    if(!text) return alert("문장을 입력하세요.");
+    const res = await fetch('/analyze_sentence_for_quiz', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ sentence: text })
+    });
+    const data = await res.json();
+    const box = document.getElementById('morpheme-chips');
+    box.innerHTML = '';
+    document.getElementById('morpheme-area').style.display = 'block';
+    data.morphs.forEach(m => {
+        const chip = document.createElement('div');
+        chip.className = 'morph-chip';
+        chip.innerText = m.form;
+        chip.onclick = function() {
+            selectTarget(`${m.form} [${m.tag}]`, `${m.form} (${m.tag})`, text);
+        }
+        box.appendChild(chip);
+    });
+  }
+
+  async function generateQuiz() {
+    const quizType = document.querySelector('input[name="quiz_type"]:checked').value;
+    const btn = document.querySelector('button[onclick="generateQuiz()"]');
+    
+    btn.textContent = "🤖 생성 중...";
+    btn.disabled = true;
+
+    try {
+        if (quizType === 'matching') {
+            const inputs = document.querySelectorAll('.matching-word-input');
+            const words = Array.from(inputs).map(input => input.value.trim()).filter(val => val !== '');
+            
+            if (words.length === 0) {
+                alert("최소 1개의 단어는 입력해야 합니다.");
+                btn.textContent = "✨ 문제 생성하기";
+                btn.disabled = false;
+                return;
+            }
+
+            const res = await fetch('/api/generate-matching', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ words: words })
+            });
+            const result = await res.json();
+
+            if (result.status === 'success') {
+                renderMatchingGame(result.data);
+            } else {
+                alert("오류: " + result.message);
+            }
+
+        } else {
+            const target = document.getElementById('final-target-value').value;
+            const grades = Array.from(document.querySelectorAll('input[name="grades"]:checked')).map(cb => cb.value);
+            const userPrompt = document.getElementById('user-prompt').value;
+            const context = document.getElementById('final-context-value').value;
+
+            if(!target) { alert("출제 대상을 선택하세요."); throw new Error("No Target"); }
+
+            const res = await fetch('/generate_quiz_action', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ target, grades, quiz_type: quizType, context, user_prompt })
+            });
+            const data = await res.json();
+            
+            if(data.error) alert(data.error);
+            else renderTextQuiz(data);
+        }
+    } catch (e) {
+        if(e.message !== "No Target") {
+            console.error(e);
+            alert("생성 중 문제가 발생했습니다.");
+        }
+    } finally {
+        btn.textContent = "✨ 문제 생성하기";
+        btn.disabled = false;
+    }
+  }
+
+  function renderTextQuiz(data) {
+    const area = document.getElementById('quiz-result-area');
+    area.style.display = 'block';
+    
+    area.innerHTML = `
+      <article class="result quiz-card">
+        <div class="quiz-header">
+           <span class="badge">생성됨</span>
+           <h3>${data.question_text}</h3>
+        </div>
+        <div id="quiz-options-container" class="mt-3"></div>
+        <div id="text-feedback" class="mt-3" style="display:none; padding:10px; background:rgba(255,255,255,0.05); border-radius:8px;">
+            <strong>💡 정답 및 해설:</strong> <span id="expl-text"></span>
+        </div>
+      </article>
+    `;
+
+    const container = document.getElementById('quiz-options-container');
+    data.options.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'quiz-opt-btn';
+        btn.innerText = `${idx+1}. ${opt}`;
+        btn.onclick = () => {
+            const btns = document.querySelectorAll('.quiz-opt-btn');
+            btns.forEach(b => b.disabled = true);
+            if (idx === data.answer_index) btn.classList.add('correct');
+            else {
+                btn.classList.add('wrong');
+                btns[data.answer_index].classList.add('correct');
+            }
+            document.getElementById('expl-text').innerText = data.explanation;
+            document.getElementById('text-feedback').style.display = 'block';
+        };
+        container.appendChild(btn);
+    });
+  }
+
+  function renderMatchingGame(data) {
+    const area = document.getElementById('quiz-result-area');
+    area.style.display = 'block';
+    
+    area.innerHTML = `
+        <article class="result quiz-card">
+            <div class="quiz-header">
+                <span class="badge" style="background:#3b82f6;">짝짓기</span>
+                <h3>단어와 뜻을 올바르게 연결하세요.</h3>
+            </div>
+            <div id="matching-game-wrapper" class="mt-4"></div>
+        </article>
+    `;
+
+    initMatchingGame('matching-game-wrapper', data);
+  }
+</script>
+{% endblock %}
