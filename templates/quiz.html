@@ -261,12 +261,19 @@
 
             if(!target) { alert("출제 대상을 선택하세요."); throw new Error("No Target"); }
 
+            // ⬇️ 이 부분을 다음과 같이 수정합니다. (변수 이름 오타 수정)
             const res = await fetch('/generate_quiz_action', {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ target, grades, quiz_type: quizType, context, user_prompt })
+                body: JSON.stringify({ 
+                    target, 
+                    grades, // ⬅️ 'grades' 변수를 정확히 사용
+                    quiz_type: quizType, 
+                    context, 
+                    user_prompt: userPrompt // ⬅️ 'userPrompt' 변수를 정확히 사용
+                })
             });
-            const data = await res.json();
-            
+data = await res.json();
+
             if(data.error) alert(data.error);
             else renderTextQuiz(data);
         }

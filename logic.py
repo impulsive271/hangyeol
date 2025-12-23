@@ -503,7 +503,6 @@ class SentenceGrader:
     def generate_quiz_item(self, model, target, level, quiz_type, context_sentence, user_prompt=""):
         type_desc = "양자택일(Binary Choice)" if quiz_type == 'binary' else "4지선다(Multiple Choice)"
         
-        # [NEW] 사용자 요청이 있을 경우 프롬프트에 추가할 텍스트
         custom_instruction = ""
         if user_prompt:
             custom_instruction = f"\n[사용자 특별 요청사항]: {user_prompt} (이 요청을 최우선으로 반영할 것)\n"
@@ -516,7 +515,8 @@ class SentenceGrader:
 유형: {type_desc}
 난이도: {level}급
 {custom_instruction}
-지시: 정답을 빈칸(____)으로 만들고 퀴즈 생성.
+지시: 1. 정답을 빈칸(____)으로 처리하여 퀴즈 질문 문장(question_text)을 완성하세요. 
+2. question_text에는 빈칸이 포함된 불완전한 문장만 넣으세요.
 출력 포맷(JSON): {{"question_text": "...", "options": ["..."], "answer_index": 0, "explanation": "..."}}"""
         else:
             prompt = f"""한국어 문제 출제자입니다.
@@ -524,9 +524,26 @@ class SentenceGrader:
 난이도: {level}급
 유형: {type_desc}
 {custom_instruction}
-지시: 위 조건을 만족하는 문제 생성.
+지시: 1. 정답을 빈칸(____)으로 처리하여 퀴즈 질문 문장(question_text)을 완성하세요. 
+2. question_text에는 빈칸이 포함된 불완전한 문장만 넣으세요.
 출력 포맷(JSON): {{"question_text": "...", "options": ["..."], "answer_index": 0, "explanation": "..."}}"""
             
         try:
-            return json.loads(model.generate_content(prompt).text.strip().replace("```json", "").replace("```", ""))
-        except Exception as e: return {"error": "AI 생성 실패", "details": str(e)}
+            raw_response = model.generate_content(prompt).text
+            
+            # ⬇️ [핵심 수정: JSON 클리닝 강화]
+            clean_json_str = raw_response.strip().replace("```json", "").replace("```", "")
+            clean_json_str = clean_json_str.replace('\n', '').replace('\t', '') # 줄바꿈/탭 문자 제거
+
+            # AI가 실수로 괄호 앞에 불필요한 텍스트를 붙이는 경우를 대비
+            start_index = clean_json_str.find('{')
+            end_index = clean_json_str.rfind('}')
+            if start_index != -1 and end_index != -1 and start_index < end_index:
+                 clean_json_str = clean_json_str[start_index : end_index + 1]
+            # ------------------------------------
+
+            return json.loads(clean_json_str)
+            
+        except Exception as e: 
+            # JSON 파싱 실패 시 원본 텍스트를 포함하여 반환 (디버깅 용이)
+            return {"error": "AI 생성 실패: JSON 파싱 오류", "details": str(e), "raw_data": raw_response}
