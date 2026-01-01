@@ -1,177 +1,192 @@
 {% extends 'base.html' %}
 {% block content %}
-  <section>
-    <h2>🚀 예문 등급 판독기</h2>
-    <p>문장을 입력하고 제출하면 등급과 상세 분석 표를 확인할 수 있습니다.</p>
+<section>
+  <h2>🚀 예문 등급 판독기</h2>
+  <p>문장을 입력하고 제출하면 등급과 상세 분석 표를 확인할 수 있습니다.</p>
 
-    <form method="post" class="form" id="grade-form">
-      <label for="sentence">문장</label>
-      <textarea id="sentence" name="sentence" rows="3" placeholder="예) 사과가 맛없으면 사과할게요">{{ last_sentence or '' }}</textarea>
+  <form method="post" class="form" id="grade-form">
+    <label for="sentence">문장</label>
+    <textarea id="sentence" name="sentence" rows="3"
+      placeholder="예) 사과가 맛없으면 사과할게요">{{ last_sentence or '' }}</textarea>
 
-      <div class="toggle-container">
-        <label class="toggle-switch">
-          <input type="checkbox" id="clear-toggle">
-          <span class="slider">
-            <span class="slider-text" data-on="ON" data-off="OFF"></span>
-          </span>
-        </label>
-        <label for="clear-toggle" class="toggle-label">문장 판독 후 지워집니다.</label>
-        <input type="hidden" id="clear-toggle-input" name="clear_on_submit" value="false">
-      </div>
+    <div class="toggle-container">
+      <label class="toggle-switch">
+        <input type="checkbox" id="clear-toggle">
+        <span class="slider">
+          <span class="slider-text" data-on="ON" data-off="OFF"></span>
+        </span>
+      </label>
+      <label for="clear-toggle" class="toggle-label">문장 판독 후 지워집니다.</label>
+      <input type="hidden" id="clear-toggle-input" name="clear_on_submit" value="false">
+    </div>
 
-      <button type="submit">판독하기</button>
-    </form>
+    <button type="submit">판독하기</button>
+  </form>
 
-    <hr style="margin: 2rem 0; border-color: var(--muted-border-color);">
+  <hr style="margin: 2rem 0; border-color: var(--muted-border-color);">
 
-    {% if graded_text %}
-      <article class="result-card">
-        <header>
-          <strong style="font-size: 1.3rem;">판독 결과</strong>
-        </header>
-        
-        <div class="grade-display" style="font-size: 1.6rem; margin: 1.5rem 0; line-height: 1.4;">
-          {{ graded_text }}
-        </div>
+  {% if graded_text %}
+  <article class="result-card">
+    <header>
+      <strong style="font-size: 1.3rem;">판독 결과</strong>
+    </header>
 
-        {% if analysis_result %}
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 3rem; margin-bottom: 0.8rem;">
-            <h3 style="margin: 0; font-weight: 700;">📊 상세 분석</h3>
-            <button type="button" class="outline contrast" onclick="copyTableText()" style="padding: 8px 20px; font-size: 0.95rem;">
-              📋 텍스트로 복사
-            </button>
-          </div>
-          
-          <div class="table-container">
-            <table id="analysis-table" class="striped">
-              <thead>
-                <tr>
-                  <th scope="col" style="width: 15%;">표제어</th>
-                  <th scope="col" style="width: 20%;">품사</th>
-                  <th scope="col" style="width: 10%;">등급</th>
-                  <th scope="col" style="width: 15%;">번호</th>
-                  <th scope="col">길잡이말</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for row in analysis_result %}
-                <tr>
-                  <td style="font-weight: bold; color: var(--color-text);">{{ row.form }}</td>
-                  <td>
-                    <span data-tooltip="{{ row.tag_code }}">{{ row.tag_name }}</span>
-                  </td>
-                  <td>
-                    {% if '급' in row.level %}
-                      <span class="grade-badge grade-{{ row.level[0] }}" style="font-size: 1.1rem; padding: 6px 14px;">{{ row.level }}</span>
-                    {% else %}
-                      <span style="color: var(--color-text-muted);">-</span>
-                    {% endif %}
-                  </td>
-                  <td style="font-family: monospace; font-size: 0.95rem; color: var(--color-text-muted);">
-                    {{ row.id }}
-                  </td>
-                  <td style="color: var(--color-secondary);">
-                    {{ row.desc }}
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        {% endif %}
-      </article>
+    <div class="grade-display" style="font-size: 1.6rem; margin: 1.5rem 0; line-height: 1.4;">
+      <span id="overall-grade-text">{{ graded_text }}</span>
+    </div>
+
+    {% if analysis_result %}
+
+    <!-- [MODIFIED] 모듈화된 분석 테이블 컴포넌트 사용 -->
+    {% include 'components/analysis_table.html' %}
+
+    <!-- [NEW] 시각화 섹션 (원그래프 + 하이라이트 원문) -->
+    {% if visualization_data %}
+    {% include 'components/visualization.html' %}
     {% endif %}
 
-    <details style="margin-top: 1rem;">
-      <summary style="font-weight: bold; cursor: pointer;">📂 대량 판독 모드 (파일 업로드)</summary>
-      <div style="padding: 1rem; border: 1px solid var(--muted-border-color); border-radius: 8px; margin-top: 0.5rem;">
-        <form action="{{ url_for('grade_upload') }}" method="post" enctype="multipart/form-data" class="grid" style="grid-template-columns: 3fr 1fr; gap: 10px; margin-bottom:0; padding:0; border:none; box-shadow:none; background:transparent;">
-          <input type="file" name="file" accept=".txt" required>
-          <button type="submit" class="secondary">일괄 판독</button>
-        </form>
-      </div>
-    </details>
-
-    {% if debug_log %}
-    <details style="margin-top: 0.5rem;">
-      <summary style="font-weight: bold; cursor: pointer; color: #ff6b6b;">🛠️ 검수용 상세 로그 (Debug)</summary>
-      <pre class="log" style="margin-top: 0.5rem; font-size: 0.9rem; line-height: 1.5;">{{ debug_log }}</pre>
-    </details>
     {% endif %}
+  </article>
+  {% endif %}
 
-  </section>
+  <details style="margin-top: 1rem;">
+    <summary style="font-weight: bold; cursor: pointer;">📂 대량 판독 모드 (파일 업로드)</summary>
+    <div style="padding: 1rem; border: 1px solid var(--muted-border-color); border-radius: 8px; margin-top: 0.5rem;">
+      <form action="{{ url_for('grade_upload') }}" method="post" enctype="multipart/form-data" class="grid"
+        style="grid-template-columns: 3fr 1fr; gap: 10px; margin-bottom:0; padding:0; border:none; box-shadow:none; background:transparent;">
+        <input type="file" name="file" accept=".txt" required>
+        <button type="submit" class="secondary">일괄 판독</button>
+      </form>
+    </div>
+  </details>
 
-  <script>
-    // [UI] 표 내용을 탭(Tab) 구분 텍스트로 복사하는 함수
-    function copyTableText() {
-      const table = document.getElementById('analysis-table');
-      if (!table) return;
+  {% if debug_log %}
+  <details style="margin-top: 0.5rem;">
+    <summary style="font-weight: bold; cursor: pointer; color: #ff6b6b;">🛠️ 검수용 상세 로그 (Debug)</summary>
+    <pre class="log" style="margin-top: 0.5rem; font-size: 0.9rem; line-height: 1.5;">{{ debug_log }}</pre>
+  </details>
+  {% endif %}
 
-      let textToCopy = "";
-      
-      // 헤더 가져오기
-      const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText);
-      textToCopy += headers.join('\t') + '\n';
+</section>
 
-      // 본문 행 가져오기
-      const rows = table.querySelectorAll('tbody tr');
-      rows.forEach(row => {
-        const cells = Array.from(row.querySelectorAll('td')).map(td => td.innerText.replace(/[\r\n]+/g, " ").trim());
-        textToCopy += cells.join('\t') + '\n';
-      });
+<script>
+  // [UI] 표 내용을 탭(Tab) 구분 텍스트로 복사하는 함수
+  function copyTableText() {
+    const table = document.getElementById('analysis-table');
+    if (!table) return;
 
-      // 클립보드 쓰기
-      navigator.clipboard.writeText(textToCopy).then(() => {
-        alert('텍스트가 복사되었습니다! 엑셀에 바로 붙여넣으세요.');
-      }).catch(err => {
-        console.error('복사 실패:', err);
-        alert('복사 권한 오류. 다시 시도해주세요.');
-      });
+    let textToCopy = "";
+
+    // 헤더 가져오기
+    const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText);
+    textToCopy += headers.join('\t') + '\n';
+
+    // 본문 행 가져오기
+    const rows = table.querySelectorAll('tbody tr');
+    rows.forEach(row => {
+      const cells = Array.from(row.querySelectorAll('td')).map(td => td.innerText.replace(/[\r\n]+/g, " ").trim());
+      textToCopy += cells.join('\t') + '\n';
+    });
+
+    // 클립보드 쓰기
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      alert('텍스트가 복사되었습니다! 엑셀에 바로 붙여넣으세요.');
+    }).catch(err => {
+      console.error('복사 실패:', err);
+      alert('복사 권한 오류. 다시 시도해주세요.');
+    });
+  }
+
+  // 기존 JS 유지
+  document.addEventListener('DOMContentLoaded', function () {
+    const gradeForm = document.getElementById('grade-form');
+    const sentenceInput = document.getElementById('sentence');
+    const clearToggle = document.getElementById('clear-toggle');
+    const hiddenInput = document.getElementById('clear-toggle-input');
+
+    sentenceInput.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        gradeForm.submit();
+      }
+    });
+
+    const savedState = localStorage.getItem('clearOnSubmit');
+    if (savedState === 'true') {
+      clearToggle.checked = true;
+      hiddenInput.value = 'true';
+    } else {
+      clearToggle.checked = false;
+      hiddenInput.value = 'false';
     }
 
-    // 기존 JS 유지
-    document.addEventListener('DOMContentLoaded', function() {
-      const gradeForm = document.getElementById('grade-form');
-      const sentenceInput = document.getElementById('sentence');
-      const clearToggle = document.getElementById('clear-toggle');
-      const hiddenInput = document.getElementById('clear-toggle-input');
-
-      sentenceInput.addEventListener('keydown', function(event) {
-        if (event.key === 'Enter' && !event.shiftKey) {
-          event.preventDefault();
-          gradeForm.submit();
-        }
-      });
-
-      const savedState = localStorage.getItem('clearOnSubmit');
-      if (savedState === 'true') {
-        clearToggle.checked = true;
-        hiddenInput.value = 'true';
-      } else {
-        clearToggle.checked = false;
-        hiddenInput.value = 'false';
-      }
-
-      clearToggle.addEventListener('change', function() {
-        hiddenInput.value = this.checked ? 'true' : 'false';
-        localStorage.setItem('clearOnSubmit', hiddenInput.value);
-      });
+    clearToggle.addEventListener('change', function () {
+      hiddenInput.value = this.checked ? 'true' : 'false';
+      localStorage.setItem('clearOnSubmit', hiddenInput.value);
     });
-  </script>
+  });
+</script>
 
-  <style>
-    .table-container { overflow-x: auto; border: 1px solid var(--muted-border-color); border-radius: 8px; }
-    table { width: 100%; border-collapse: collapse; font-size: 1.05rem; }
-    th { background-color: rgba(255, 255, 255, 0.05); text-align: left; font-weight: 600; padding: 14px; }
-    td { padding: 14px; border-bottom: 1px solid var(--muted-border-color); vertical-align: middle; }
-    tr:last-child td { border-bottom: none; }
-    
-    .grade-badge { display: inline-block; border-radius: 12px; color: #fff; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-    .grade-1 { background-color: #10b981; }
-    .grade-2 { background-color: #3b82f6; }
-    .grade-3 { background-color: #8b5cf6; }
-    .grade-4 { background-color: #f59e0b; }
-    .grade-5 { background-color: #ef4444; }
-    .grade-6 { background-color: #64748b; }
-  </style>
+<style>
+  .table-container {
+    overflow-x: auto;
+    border: 1px solid var(--muted-border-color);
+    border-radius: 8px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 1.05rem;
+  }
+
+  th {
+    background-color: rgba(255, 255, 255, 0.05);
+    text-align: left;
+    font-weight: 600;
+    padding: 14px;
+  }
+
+  td {
+    padding: 14px;
+    border-bottom: 1px solid var(--muted-border-color);
+    vertical-align: middle;
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
+
+  .grade-badge {
+    display: inline-block;
+    border-radius: 12px;
+    color: #fff;
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  }
+
+  .grade-1 {
+    background-color: #10b981;
+  }
+
+  .grade-2 {
+    background-color: #3b82f6;
+  }
+
+  .grade-3 {
+    background-color: #8b5cf6;
+  }
+
+  .grade-4 {
+    background-color: #f59e0b;
+  }
+
+  .grade-5 {
+    background-color: #ef4444;
+  }
+
+  .grade-6 {
+    background-color: #64748b;
+  }
+</style>
 {% endblock %}
