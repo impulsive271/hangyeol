@@ -1,87 +1,408 @@
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
-  <h4 style="margin: 0; font-weight: 700; color: #ccc;">📊 상세 분석 결과</h4>
-  <button type="button" class="outline contrast" onclick="copyTableText()" style="padding: 6px 16px; font-size: 0.85rem; margin-bottom: 0;">
-    📋 텍스트로 복사
-  </button>
+    <h4 style="margin: 0; font-weight: 700; color: #ccc;">📊 상세 분석 결과</h4>
+    <button type="button" class="outline contrast" onclick="copyTableText()"
+        style="padding: 6px 16px; font-size: 0.85rem; margin-bottom: 0;">
+        📋 텍스트로 복사
+    </button>
 </div>
 
 <div class="table-container">
-  <table id="analysis-table" class="striped">
-    <thead>
-      <tr>
-        <th scope="col" style="width: 15%;">표제어</th>
-        <th scope="col" style="width: 20%;">품사</th>
-        <th scope="col" style="width: 10%;">등급</th>
-        <th scope="col" style="width: 15%;">번호</th>
-        <th scope="col">길잡이말</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for row in analysis_result %}
-      <tr>
-        <td style="font-weight: bold; color: var(--color-text);">{{ row.form }}</td>
-        <td>
-          <span data-tooltip="{{ row.tag_code }}" style="border-bottom: 1px dotted #888; cursor: help;">
-            {{ row.tag_name }}
-          </span>
-        </td>
-        <td>
-          {% if '급' in row.level %}
-            <span class="grade-badge grade-{{ row.level[0] }}" style="font-size: 1rem; padding: 4px 12px;">
-              {{ row.level }}
-            </span>
-          {% else %}
-            <span style="color: var(--color-text-muted);">-</span>
-          {% endif %}
-        </td>
-        <td style="font-family: monospace; font-size: 0.95rem; color: var(--color-text-muted);">
-          {{ row.id }}
-        </td>
-        <td style="color: var(--color-secondary);">
-          {{ row.desc }}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+    <table id="analysis-table" class="striped">
+        <thead>
+            <tr>
+                <th scope="col" style="width: 15%;">표제어</th>
+                <th scope="col" style="width: 20%;">품사</th>
+                <th scope="col" style="width: 10%;">등급</th>
+                <th scope="col" style="width: 15%;">번호</th>
+                <th scope="col">길잡이말</th>
+                <th scope="col" style="width: 60px; text-align: center;">수정</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in analysis_result %}
+            <tr data-original-form="{{ row.form }}" data-tag-code="{{ row.tag_code }}"
+                data-offset="{{ row.offset_start }}" data-ui-id="{{ row._ui_id }}">
+                <td class="cell-form" style="font-weight: bold; color: var(--color-text);">{{ row.form }}</td>
+                <td class="cell-pos">
+                    <span data-tooltip="{{ row.tag_code }}" style="border-bottom: 1px dotted #888; cursor: help;">
+                        {{ row.tag_name }}
+                    </span>
+                </td>
+                <td class="cell-grade">
+                    {% if '급' in row.level %}
+                    <span class="grade-badge grade-{{ row.level[0] }}" style="font-size: 1rem; padding: 4px 12px;">
+                        {{ row.level }}
+                    </span>
+                    {% else %}
+                    <span style="color: var(--color-text-muted);">-</span>
+                    {% endif %}
+                </td>
+                <td class="cell-id" style="font-family: monospace; font-size: 0.95rem; color: var(--color-text-muted);">
+                    {{ row.id }}
+                </td>
+                <td class="cell-desc" style="color: var(--color-secondary);">
+                    {{ row.desc }}
+                </td>
+                <td style="text-align: center;">
+                    <button class="btn-edit-row" onclick="openEditModal(this)" title="등급 수동 수정">
+                        ✏️
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 
+<!-- 수동 수정 모달 -->
+<dialog id="word-edit-modal">
+    <article style="min-width: 500px;">
+        <header>
+            <button aria-label="Close" rel="prev" onclick="closeEditModal()"></button>
+            <strong>🛠️ 등급 수동 수정</strong>
+        </header>
+        <p style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--color-text-muted);">
+            검색을 통해 해당 행의 정보를 교체합니다. <br>
+            (기존 표제어는 유지되거나 '기존 -> 새단어'로 표시됩니다.)
+        </p>
+
+        <!-- [MODIFIED] Unified Search Bar Style -->
+        <div class="grid" style="grid-template-columns: 1fr 3fr; gap: 10px; margin-bottom: 1rem;">
+            <select id="edit-search-type" style="margin-bottom:0;">
+                <option value="word" selected>단어</option>
+                <option value="grammar">문법</option>
+            </select>
+            <input type="search" id="edit-search-input" placeholder="검색어를 입력하세요 (예: 잡다, 진흙)" style="margin-bottom:0;"
+                autocomplete="off">
+        </div>
+
+        <div id="edit-search-results"
+            style="max-height: 300px; overflow-y: auto; border: 1px solid var(--muted-border-color); border-radius: 8px; display: none;">
+            <!-- 결과 리스트 -->
+        </div>
+    </article>
+</dialog>
+
 <style>
-  .table-container { overflow-x: auto; border: 1px solid var(--muted-border-color); border-radius: 8px; }
-  table { width: 100%; border-collapse: collapse; font-size: 1.05rem; }
-  th { background-color: rgba(255, 255, 255, 0.05); text-align: left; font-weight: 600; padding: 14px; }
-  td { padding: 14px; border-bottom: 1px solid var(--muted-border-color); vertical-align: middle; }
-  tr:last-child td { border-bottom: none; }
-  
-  /* 오리지널 등급 색상 복원 */
-  .grade-badge { display: inline-block; border-radius: 12px; color: #fff; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-  .grade-1 { background-color: #10b981; } /* 초록 */
-  .grade-2 { background-color: #3b82f6; } /* 파랑 */
-  .grade-3 { background-color: #8b5cf6; } /* 보라 */
-  .grade-4 { background-color: #f59e0b; } /* 노랑 */
-  .grade-5 { background-color: #ef4444; } /* 빨강 */
-  .grade-6 { background-color: #64748b; } /* 회색 */
+    .table-container {
+        overflow-x: auto;
+        border: 1px solid var(--muted-border-color);
+        border-radius: 8px;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 1.05rem;
+    }
+
+    th {
+        background-color: rgba(255, 255, 255, 0.05);
+        text-align: left;
+        font-weight: 600;
+        padding: 14px;
+    }
+
+    td {
+        padding: 14px;
+        border-bottom: 1px solid var(--muted-border-color);
+        vertical-align: middle;
+    }
+
+    tr:last-child td {
+        border-bottom: none;
+    }
+
+    /* 오리지널 등급 색상 복원 (테이블 내부용) */
+    .grade-badge {
+        display: inline-block;
+        border-radius: 12px;
+        color: #fff;
+        font-weight: bold;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    }
+
+    .grade-1 {
+        background-color: #10b981;
+    }
+
+    .grade-2 {
+        background-color: #3b82f6;
+    }
+
+    .grade-3 {
+        background-color: #8b5cf6;
+    }
+
+    .grade-4 {
+        background-color: #f59e0b;
+    }
+
+    .grade-5 {
+        background-color: #ef4444;
+    }
+
+    .grade-6 {
+        background-color: #64748b;
+    }
+
+
+    /* 수정 버튼 스타일 */
+    .btn-edit-row {
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        font-size: 1.1rem;
+        opacity: 0.3;
+        transition: opacity 0.2s;
+        padding: 4px;
+    }
+
+    .btn-edit-row:hover {
+        opacity: 1;
+        transform: scale(1.1);
+    }
+
+    /* [MODIFIED] 검색 결과 리스트 아이템 스타일 (Feature 2 표준과 동일하게 수정) */
+    .edit-result-item {
+        padding: 12px;
+        border-bottom: 1px solid #333;
+        cursor: pointer;
+        transition: background 0.1s;
+        text-align: left;
+        /* 기존 flex/background 제거하여 Feature 2 스타일로 통일 */
+    }
+
+    .edit-result-item:hover {
+        background-color: #3e3e3e;
+    }
+
+    .edit-result-item:last-child {
+        border-bottom: none;
+    }
 </style>
 
 <script>
-  function copyTableText() {
-    const table = document.getElementById('analysis-table');
-    if (!table) return;
-    let textToCopy = "";
-    
-    // 헤더
-    const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText);
-    textToCopy += headers.join('\t') + '\n';
-    
-    // 본문
-    const rows = table.querySelectorAll('tbody tr');
-    rows.forEach(row => {
-      const cells = Array.from(row.querySelectorAll('td')).map(td => td.innerText.replace(/[\r\n]+/g, " ").trim());
-      textToCopy += cells.join('\t') + '\n';
-    });
+    let currentEditingRow = null;
+    let localDebounceTimer; // [NEW] 디바운싱 타이머
 
-    navigator.clipboard.writeText(textToCopy).then(() => {
-      alert('텍스트가 복사되었습니다! 엑셀에 붙여넣기 좋습니다.');
-    });
-  }
+    function copyTableText() {
+        const table = document.getElementById('analysis-table');
+        if (!table) return;
+        let textToCopy = "";
+
+        // 헤더
+        const headers = Array.from(table.querySelectorAll('thead th'))
+            .slice(0, -1)
+            .map(th => th.innerText);
+        textToCopy += headers.join('\t') + '\n';
+
+        // 본문
+        const rows = table.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            const cells = Array.from(row.querySelectorAll('td'))
+                .slice(0, -1)
+                .map(td => td.innerText.replace(/[\r\n]+/g, " ").trim());
+            textToCopy += cells.join('\t') + '\n';
+        });
+
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            alert('텍스트가 복사되었습니다! 엑셀에 붙여넣기 좋습니다.');
+        });
+    }
+
+    function openEditModal(btn) {
+        currentEditingRow = btn.closest('tr');
+        const modal = document.getElementById('word-edit-modal');
+        modal.showModal();
+
+        // [NEW] Auto-Search Implementation
+        const originalForm = currentEditingRow.dataset.originalForm || currentEditingRow.querySelector('.cell-form').innerText;
+        const tagCode = currentEditingRow.dataset.tagCode || ""; // Get tag code
+
+        const searchInput = document.getElementById('edit-search-input');
+        const typeSelect = document.getElementById('edit-search-type');
+
+        // Auto-detect type
+        if (tagCode.startsWith('J') || tagCode.startsWith('E')) {
+            typeSelect.value = 'grammar';
+        } else {
+            typeSelect.value = 'word';
+        }
+
+        searchInput.value = originalForm; // Pre-fill
+        searchInput.focus();
+
+        // Trigger search immediately with correct type
+        searchForEdit(originalForm, typeSelect.value);
+    }
+
+    function closeEditModal() {
+        const modal = document.getElementById('word-edit-modal');
+        modal.close();
+        currentEditingRow = null;
+    }
+
+    // [MODIFIED] 디바운싱 적용된 이벤트 리스너
+    const editSearchInput = document.getElementById('edit-search-input');
+    if (editSearchInput) {
+        // 엔터키 방지 (폼 전송 방지)
+        editSearchInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') e.preventDefault();
+        });
+
+        editSearchInput.addEventListener('input', function () {
+            const query = this.value.trim();
+            const type = document.getElementById('edit-search-type').value;
+
+            if (query.length < 1) {
+                clearTimeout(localDebounceTimer);
+                document.getElementById('edit-search-results').style.display = 'none';
+                return;
+            }
+
+            // 디바운싱 (300ms)
+            clearTimeout(localDebounceTimer);
+            localDebounceTimer = setTimeout(() => {
+                searchForEdit(query, type);
+            }, 300);
+        });
+    }
+
+    async function searchForEdit(query, type) {
+        const list = document.getElementById('edit-search-results');
+        // list.innerHTML = '<div style="padding:10px; text-align:center;">검색 중...</div>'; 
+        // -> 검색 중 표시는 타이핑 중에 거슬릴 수 있으므로 생략하거나 최소화
+
+        try {
+            const res = await fetch(`/api/search?q=${encodeURIComponent(query)}&type=${type}`);
+            const data = await res.json();
+
+            list.innerHTML = '';
+            if (data.length === 0) {
+                list.style.display = 'block';
+                list.innerHTML = '<div style="padding:10px; text-align:center; color:#888;">검색 결과가 없습니다.</div>';
+                return;
+            }
+
+            list.style.display = 'block';
+            data.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'edit-result-item'; // CSS 클래스 적용
+
+                // 렌더링 로직 (search.js와 동일하게 구성)
+
+                // 1. 힌트
+                const hintText = (item.desc && item.desc !== 'nan')
+                    ? `<span style="color:#aaa; font-size:0.85em; margin-left:6px;">${item.desc}</span>`
+                    : '';
+
+                // 2. 품사
+                const posText = item.pos
+                    ? `<span style="color:#a855f7; font-weight:600; font-size:0.85em; margin-left:4px;">[${item.pos}]</span>`
+                    : '';
+
+                // 3. 관련형
+                let relatedText = '';
+                if (item.related) {
+                    relatedText = `<span style="color:#ff9f43; font-size:0.8em; margin-left:6px;">(관련형: ${item.related})</span>`;
+                }
+
+                // 4. 등급 배지 (Solid Color)
+                const gradeNum = item.grade.replace(/[^0-9]/g, '');
+                const colorMap = {
+                    '1': '#10b981', '2': '#3b82f6', '3': '#8b5cf6',
+                    '4': '#f59e0b', '5': '#ef4444', '6': '#64748b'
+                };
+                const bgColor = colorMap[gradeNum] || '#94a3b8';
+
+                div.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            <strong>${item.text}</strong>
+                            ${posText}
+                            ${relatedText}
+                            ${hintText}
+                        </div>
+                        <span style="font-size:0.75em; color:#fff; background:${bgColor}; padding: 2px 6px; border-radius:4px; white-space: nowrap; margin-left: 10px;">
+                            ${item.grade}
+                        </span>
+                    </div>
+                `;
+
+                div.onclick = () => applyEdit(item);
+                list.appendChild(div);
+            });
+
+        } catch (e) {
+            list.innerHTML = `<div style="padding:10px; color:red;">에러: ${e}</div>`;
+        }
+    }
+
+    function applyEdit(item) {
+        if (!currentEditingRow) return;
+
+        // [NEW] Text Cleaning Logic
+        // 1. Remove trailing numbers (e.g., "신문02" -> "신문")
+        // 2. Remove leading/trailing hyphens/tildes (e.g., "-을까" -> "을까")
+        let cleanText = item.text || item.word || "";
+        cleanText = cleanText.replace(/[0-9]+$/, '');
+        cleanText = cleanText.replace(/^[-~]+|[-~]+$/g, '');
+
+        // 1. 표제어 (원래 -> 새거)
+        const originalForm = currentEditingRow.dataset.originalForm || currentEditingRow.querySelector('.cell-form').innerText;
+        // 만약 이미 수정된 상태라면 originalForm 유지
+        if (!currentEditingRow.dataset.originalForm) {
+            currentEditingRow.dataset.originalForm = originalForm;
+        }
+
+        const formCell = currentEditingRow.querySelector('.cell-form');
+        // 같은 단어면 그대로, 다르면 화살표 표시
+        if (originalForm === cleanText) {
+            formCell.innerText = cleanText;
+        } else {
+            formCell.innerHTML = `<span style="text-decoration: line-through; color: #999; font-weight:normal;">${originalForm}</span> ➜ ${cleanText}`;
+        }
+
+        // 2. 품사
+        const posCell = currentEditingRow.querySelector('.cell-pos');
+        posCell.innerHTML = `<span>${item.pos}</span> <span style="font-size:0.7em; color:violet;">(수정됨)</span>`;
+
+        // 3. 등급 (Keep original solid badges in the table, user only asked for SEARCH results to be changed)
+        const gradeCell = currentEditingRow.querySelector('.cell-grade');
+        const gradeNum = item.grade.replace('급', '');
+        gradeCell.innerHTML = `<span class="grade-badge grade-${gradeNum}" style="font-size: 1rem; padding: 4px 12px;">${item.grade}</span>`;
+
+        // 4. 번호 (ID)
+        const idCell = currentEditingRow.querySelector('.cell-id');
+        idCell.innerText = "수동교정";
+
+        // 5. 길잡이말
+        const descCell = currentEditingRow.querySelector('.cell-desc');
+        descCell.innerText = item.desc || item.meaning;
+
+        // [NEW] Refresh Full UI (Pie Chart + Overall Grade + Visualized Text)
+        if (window.refreshGradeChart) {
+            window.refreshGradeChart(); // Internally calls updateOverallGrade
+        }
+
+        if (window.updateVisualizedText) {
+            const offset = currentEditingRow.dataset.offset;
+            const uiId = currentEditingRow.dataset.uiId;
+            // Use cleaned text for visualization as well
+            const newText = cleanText;
+
+            // Robustly get original form (try dataset first, then cell text)
+            let originalForm = currentEditingRow.dataset.originalForm;
+            if (!originalForm) {
+                const formCell = currentEditingRow.querySelector('.cell-form');
+                if (formCell) originalForm = formCell.innerText.trim();
+            }
+
+            window.updateVisualizedText(offset, item.grade, item.desc || item.meaning, newText, originalForm || "", uiId);
+        }
+
+        // [Moved] Close modal LAST to ensure currentEditingRow remains valid during updates
+        closeEditModal();
+    }
 </script>

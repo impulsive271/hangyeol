@@ -1,0 +1,357 @@
+<!-- [NEW] 시각화 섹션 (원그래프 + 하이라이트 원문) -->
+<hr style="margin: 3rem 0; border-color: var(--muted-border-color);">
+
+<div class="visualization-container" style="display: flex; flex-direction: column; gap: 2rem;">
+
+    <!-- 1. 원그래프 영역 -->
+    <div>
+        <h3 style="margin-bottom: 1rem; font-weight: 700;">🍰 등급 분포</h3>
+        <div style="max-width: 500px; margin: 0 auto;">
+            <div id="gradeChart"></div>
+        </div>
+    </div>
+
+    <!-- 2. 하이라이트 원문 영역 -->
+    <div>
+        <h3 style="margin-bottom: 1rem; font-weight: 700;">📝 시각화된 원문</h3>
+        <p style="color: var(--color-text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+            * 그래프의 각 조각에 마우스를 올리면 해당 등급의 단어가 강조됩니다.
+        </p>
+        <div id="highlighted-text-box"
+            style="padding: 1.5rem; border-radius: 12px; line-height: 2.0; font-size: 1.2rem; border: 1px solid var(--muted-border-color);">
+            {% for seg in text_segments %}
+            {% if seg.type == 'graded' %}
+            <span class="interactive-word {{ seg.class }}" data-grade="{{ seg.class }}"
+                data-offset="{{ seg.info.offset_start }}" data-ui-id="{{ seg.info._ui_id }}"
+                data-tooltip="{{ seg.info.level }} - {{ seg.info.desc }}">
+                {{ seg.text }}
+            </span>
+            {% else %}
+            <span>{{ seg.text }}</span>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+
+<!-- Data Passing (Safe Pattern) -->
+<script id="viz-data-labels" type="application/json">
+    {{ visualization_data.labels | tojson | default('[]') }}
+</script>
+<script id="viz-data-data" type="application/json">
+    {{ visualization_data.data | tojson | default('[]') }}
+</script>
+
+<!-- Highcharts 로드 확인 및 스크립트 실행 -->
+<script>
+    console.log("[visualization.html] Script loaded (Safe Pattern).");
+
+    // Highcharts 로드 여부 체킹 함수
+    function loadHighcharts(callback) {
+        if (window.Highcharts && window.Highcharts.chart) {
+            callback();
+            return;
+        }
+        // Highcharts가 없으면 동적 로드 (CDN)
+        const scriptMain = document.createElement('script');
+        scriptMain.src = 'https://code.highcharts.com/highcharts.js';
+        scriptMain.onload = function () {
+            const script3d = document.createElement('script');
+            script3d.src = 'https://code.highcharts.com/highcharts-3d.js';
+            script3d.onload = callback;
+            document.head.appendChild(script3d);
+        };
+        document.head.appendChild(scriptMain);
+    }
+
+    let gradeChartInstance = null; // Chart instance storage
+
+    // Global function to refresh chart from table data
+    window.refreshGradeChart = function () {
+        console.log("[refreshGradeChart] Called.");
+        if (!gradeChartInstance) {
+            console.warn("[refreshGradeChart] Chart instance not ready.");
+            return;
+        }
+
+        // 1. Recalculate counts from the table
+        const gradeCounts = { '1급': 0, '2급': 0, '3급': 0, '4급': 0, '5급': 0, '6급': 0 };
+        const rows = document.querySelectorAll('#analysis-table tbody tr');
+
+        let maxGrade = 0; // Track max grade for overall update
+
+        if (rows.length === 0) return;
+
+        rows.forEach(row => {
+            const gradeBadge = row.querySelector('.grade-badge');
+            if (gradeBadge) {
+                const gradeText = gradeBadge.innerText.trim(); // e.g., "1급"
+                if (gradeCounts[gradeText] !== undefined) {
+                    gradeCounts[gradeText]++;
+
+                    const levelNum = parseInt(gradeText.replace('급', ''));
+                    if (levelNum > maxGrade) maxGrade = levelNum;
+                }
+            }
+        });
+
+        // 2. Format data for Highcharts
+        const gradeColors = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#64748b'];
+        const chartData = [];
+
+        Object.keys(gradeCounts).forEach((gradeKey, index) => {
+            if (gradeCounts[gradeKey] > 0) {
+                const gradeNum = parseInt(gradeKey.replace('급', ''));
+                chartData.push({
+                    name: gradeKey,
+                    y: gradeCounts[gradeKey],
+                    color: gradeColors[gradeNum - 1],
+                    gradeIndex: gradeNum
+                });
+            }
+        });
+
+        // 3. Update Chart
+        gradeChartInstance.series[0].setData(chartData);
+
+        // 4. Update Overall Grade Badge
+        window.updateOverallGrade(maxGrade);
+    };
+
+    // [NEW] Global function to update overall grade badge
+    window.updateOverallGrade = function (maxGrade) {
+        const gradeText = maxGrade > 0 ? `${maxGrade}급` : '판독불가';
+
+        // Target in grade.html
+        const overallText = document.getElementById('overall-grade-text');
+        if (overallText) overallText.innerText = gradeText;
+
+        // Target in generate.html
+        const overallBadge = document.getElementById('overall-grade-badge');
+        if (overallBadge) {
+            overallBadge.className = `grade-badge grade-${maxGrade}`; // Update color class
+            overallBadge.innerText = `최종: ${gradeText}`;
+        }
+    };
+
+    // [NEW] Global function to update visualized text
+    window.updateVisualizedText = function (offset, newGrade, newDesc, newForm, originalForm, uiId) {
+        console.log(`[updateVisualizedText] Called with: offset=${offset}, newGrade=${newGrade}, uiId=${uiId}, newForm=${newForm}`);
+        let span = null;
+
+        // 0. [Priority] Try finding by Unique UI ID
+        if (uiId) {
+            span = document.querySelector(`.interactive-word[data-ui-id="${uiId}"]`);
+        }
+
+        // 1. Try finding by offset (Fallback 1)
+        if (!span) {
+            span = document.querySelector(`.interactive-word[data-offset="${offset}"]`);
+        }
+
+        // 2. Fallback 2: Try finding by Exact text content
+        if (!span && originalForm) {
+            const spans = document.querySelectorAll('.interactive-word');
+            for (let s of spans) {
+                if (s.innerText.trim() === originalForm.trim()) {
+                    span = s;
+                    break;
+                }
+            }
+        }
+
+        if (!span) {
+            const msg = `[오류] 시각화된 텍스트에서 해당 단어를 찾을 수 없습니다.\nUI ID: ${uiId}\nOffset: ${offset}\nOriginal: ${originalForm}`;
+            console.error(msg);
+            // alert(msg); // 사용자 요청 시 주석 해제하여 디버깅 가능하도록
+            return;
+        }
+
+        // --- Apply Updates ---
+        const gradeNum = newGrade.replace(/[^0-9]/g, '');
+        const newClass = `text-grade-${gradeNum}`;
+
+        // 1. Update Class (Color) - Remove old classes first
+        span.classList.remove('text-grade-1', 'text-grade-2', 'text-grade-3', 'text-grade-4', 'text-grade-5', 'text-grade-6');
+        span.classList.add(newClass);
+        span.dataset.grade = newClass;
+
+        // 2. Update Tooltip
+        span.dataset.tooltip = `${newGrade} - ${newDesc}`;
+
+        // 3. Update Text Content
+        if (newForm && newForm.trim() !== "") {
+            span.innerText = newForm;
+        }
+
+        // 4. Visual Feedback
+        span.style.transition = "background-color 0.5s ease";
+        span.style.backgroundColor = "#fffbeb"; // Light yellow highlight
+        setTimeout(() => {
+            span.style.backgroundColor = "transparent";
+        }, 500);
+
+        console.log("[updateVisualizedText] Success.");
+    };
+
+
+    document.addEventListener('DOMContentLoaded', function () {
+        loadHighcharts(function () {
+            // 초기 데이터 세팅 (서버에서 받은걸로) - JSON Script parsing pattern
+            let initialLabels = [];
+            let initialData = [];
+
+            try {
+                const labelsEl = document.getElementById('viz-data-labels');
+                const dataEl = document.getElementById('viz-data-data');
+
+                if (labelsEl && labelsEl.textContent.trim()) {
+                    initialLabels = JSON.parse(labelsEl.textContent);
+                }
+                if (dataEl && dataEl.textContent.trim()) {
+                    initialData = JSON.parse(dataEl.textContent);
+                }
+            } catch (e) {
+                console.error("[visualization.html] Error parsing visualization data:", e);
+                // Fail gracefully
+            }
+
+            const gradeColors = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#64748b'];
+
+            if (!initialLabels || initialLabels.length === 0) {
+                const chartDiv = document.getElementById('gradeChart');
+                if (chartDiv) chartDiv.innerHTML = '<p style="text-align:center; color:#999;">표시할 데이터가 없습니다.</p>';
+                return;
+            }
+
+            const chartData = initialLabels.map((label, index) => {
+                const gradeNum = parseInt(label.replace(/[^0-9]/g, ''));
+                return {
+                    name: label,
+                    y: initialData[index],
+                    color: gradeColors[gradeNum - 1],
+                    gradeIndex: gradeNum
+                };
+            });
+
+            gradeChartInstance = Highcharts.chart('gradeChart', {
+                chart: {
+                    type: 'pie',
+                    options3d: { enabled: true, alpha: 45, beta: 0 },
+                    backgroundColor: 'transparent',
+                    height: 400
+                },
+                title: { text: '' },
+                tooltip: { pointFormat: '{series.name}: <b>{point.y}개 ({point.percentage:.1f}%)</b>' },
+                plotOptions: {
+                    pie: {
+                        allowPointSelect: true,
+                        cursor: 'pointer',
+                        depth: 35,
+                        dataLabels: {
+                            enabled: true,
+                            format: '{point.name}',
+                            style: { fontSize: '20px', fontWeight: 'bold', color: 'var(--color-text)' }
+                        },
+                        point: {
+                            events: {
+                                mouseOver: function () {
+                                    const targetClass = `text-grade-${this.gradeIndex}`;
+                                    document.querySelectorAll(`.${targetClass}`).forEach(el => el.classList.add('highlight-active'));
+                                },
+                                mouseOut: function () {
+                                    document.querySelectorAll('.interactive-word').forEach(el => el.classList.remove('highlight-active'));
+                                }
+                            }
+                        }
+                    }
+                },
+                series: [{ name: '개수', data: chartData }],
+                credits: { enabled: false }
+            });
+        });
+    });
+</script>
+
+<style>
+    .grade-badge {
+        display: inline-block;
+        border-radius: 12px;
+        color: #fff;
+        font-weight: bold;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    }
+
+    /* 테이블 뱃지용 (배경색 있음) */
+    .grade-1 {
+        background-color: #10b981;
+    }
+
+    .grade-2 {
+        background-color: #3b82f6;
+    }
+
+    .grade-3 {
+        background-color: #8b5cf6;
+    }
+
+    .grade-4 {
+        background-color: #f59e0b;
+    }
+
+    .grade-5 {
+        background-color: #ef4444;
+    }
+
+    .grade-6 {
+        background-color: #64748b;
+    }
+
+    /* 텍스트 시각화용 (배경색 없음, 글자색만, 기본 밑줄 없음) */
+    .text-grade-1,
+    .text-grade-2,
+    .text-grade-3,
+    .text-grade-4,
+    .text-grade-5,
+    .text-grade-6 {
+        text-decoration: none;
+        font-weight: 500;
+    }
+
+    .text-grade-1 {
+        color: #10b981;
+    }
+
+    .text-grade-2 {
+        color: #3b82f6;
+    }
+
+    .text-grade-3 {
+        color: #8b5cf6;
+    }
+
+    .text-grade-4 {
+        color: #f59e0b;
+    }
+
+    .text-grade-5 {
+        color: #ef4444;
+    }
+
+    .text-grade-6 {
+        color: #64748b;
+    }
+
+    /* 강조 효과 (Bold + Underline) */
+    .highlight-active {
+        font-weight: 900 !important;
+        text-decoration: underline;
+        text-decoration-thickness: 3px;
+        transform: scale(1.1);
+        /* 살짝 커지는 효과 추가 */
+        display: inline-block;
+        /* transform 적용 위해 */
+        transition: all 0.2s ease;
+    }
+</style>

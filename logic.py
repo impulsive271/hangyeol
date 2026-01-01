@@ -64,7 +64,7 @@ class SentenceGrader:
                 'NNG': 'N', 'NNP': 'N', 'NR': 'N', 'NP': 'N', 
                 'NNB': 'NB', 
                 'VV': 'V', 'VA': 'V', 'VX': 'V', 'VCP': 'V', 'VCN': 'V',
-                'VV-I': 'V', 'VA-I': 'V', 'VX-I': 'V',
+                'VV-I': 'V', 'VA-I': 'V', 'VX-I': 'V', 'VV-R': 'V', 'VA-R': 'V', # [FIX] 불규칙/규칙 활용 태그 추가
                 'MM': 'M', 'MAG': 'MA', 'MAJ': 'MA', 'IC': 'I',
                 'EC': 'EC', 'EF': 'EF', 'EP': 'EP', 'ETN': 'ET', 'ETM': 'ET',
                 'JKS': 'J', 'JKC': 'J', 'JKG': 'J', 'JKO': 'J', 'JKB': 'J', 
@@ -269,6 +269,10 @@ class SentenceGrader:
             token = tokens[i]
             form = token.form; tag = token.tag; form_clean = self._clean_key(form)
             
+            # [NEW] 오프셋 정보 확보 (기본값)
+            t_start = token.start
+            t_len = token.len
+            
             # 0. 표현 패턴 매칭
             idiom_matched = False
             if form_clean in self.idiom_map:
@@ -292,9 +296,15 @@ class SentenceGrader:
                         if level_str:
                             try: max_level = max(max_level, int(re.sub(r'[^0-9]', '', str(level_str))))
                             except: pass
+                        
+                        # [NEW] 표현의 전체 길이 계산
+                        last_t = tokens[i + len(seq)]
+                        full_len = (last_t.start + last_t.len) - t_start
+
                         analysis_data.append({
                             "form": full_pattern_text, "tag_code": "Expression", "tag_name": "문법적 표현",
-                            "level": level_str, "id": f"표현#{data['uid']}", "desc": data['desc']
+                            "level": level_str, "id": f"표현#{data['uid']}", "desc": data['desc'],
+                            "offset_start": t_start, "offset_len": full_len # offset 추가
                         })
                         i += (1 + len(seq))
                         idiom_matched = True; break
@@ -310,7 +320,8 @@ class SentenceGrader:
                     except: pass
                 analysis_data.append({
                     "form": form, "tag_code": tag, "tag_name": self.friendly_pos_map.get(tag, tag),
-                    "level": level_str, "id": f"문법#{final_cand['uid']}", "desc": final_cand['desc']
+                    "level": level_str, "id": f"문법#{final_cand['uid']}", "desc": final_cand['desc'],
+                    "offset_start": t_start, "offset_len": t_len # offset 추가
                 })
                 i += 1; continue 
 
@@ -320,10 +331,22 @@ class SentenceGrader:
                 curr_pos_type = self.pos_map.get(tag, 'ETC')
                 next_pos_type = self.pos_map.get(next_token.tag, 'ETC')
                 
-                if curr_pos_type in ['N', 'NB'] and next_pos_type in ['N', 'NB']:
-                    combined_form = form_clean + self._clean_key(next_token.form)
-                    if (combined_form, 'N') in self.word_map:
-                        merged_cands = self.word_map[(combined_form, 'N')]
+                # [CASE A] 명사 + 명사 (N + N)
+                is_noun_merge = (curr_pos_type in ['N', 'NB'] and next_pos_type in ['N', 'NB'])
+                
+                # [CASE B] 어근(XR) + 파생접미사(XSA, XSV) -> 용언화
+                # 예: 자세(XR) + 하(XSA) -> 자세하다(VA)
+                is_root_merge = (tag == 'XR' and next_token.tag in ['XSA', 'XSV', 'XSA-I', 'XSV-I'])
+
+                if is_noun_merge or is_root_merge:
+                    # 어근 병합이면 '다'를 붙여서 용언처럼 만듦
+                    suffix = '다' if is_root_merge else ''
+                    
+                    combined_form = form_clean + self._clean_key(next_token.form) + suffix
+                    target_pos = 'V' if is_root_merge else 'N'
+                    
+                    if (combined_form, target_pos) in self.word_map:
+                        merged_cands = self.word_map[(combined_form, target_pos)]
                         
                         # 대표형 우선 필터링
                         main_cands = [c for c in merged_cands if c.get('is_main', False)]
@@ -334,19 +357,24 @@ class SentenceGrader:
                         
                         final_cand = merged_cands[0] 
                         level_str = final_cand['level']
-                        debug_lines.append(f"🔄 병합 성공: {combined_form} (N) -> {level_str}")
+                        debug_lines.append(f"🔄 병합 성공: {combined_form} ({target_pos}) -> {level_str}")
                         if level_str:
                             try: max_level = max(max_level, int(re.sub(r'[^0-9]', '', str(level_str))))
                             except: pass
+                        
+                        pos_label = "동사/형용사(파생)" if is_root_merge else "복합어"
+                        
                         analysis_data.append({
-                            "form": combined_form, "tag_code": f"{tag}+{next_token.tag}", "tag_name": "복합어",
-                            "level": level_str, "id": f"단어#{final_cand['uid']}", "desc": final_cand['desc']
+                            "form": combined_form, "tag_code": f"{tag}+{next_token.tag}", "tag_name": pos_label,
+                            "level": level_str, "id": f"단어#{final_cand['uid']}", "desc": final_cand['desc'],
+                            "offset_start": t_start, "offset_len": (next_token.start + next_token.len) - t_start
                         })
                         i += 2; continue
 
             # 2. 단일 토큰 처리
             source_type = ""; search_key = ""; candidates = []
             pos_key = self.pos_map.get(tag, 'ETC')
+            target = form_clean # [FIX] 기본값 초기화
 
             if tag in ['XSV', 'XSA'] and form_clean == '하':
                 source_type = "접미사"; candidates = [{'level': '1급', 'uid': 'Sys', 'desc': '파생 접미사', 'is_main': True}]
@@ -392,7 +420,8 @@ class SentenceGrader:
             analysis_data.append({
                 "form": form, "tag_code": tag, "tag_name": self.friendly_pos_map.get(tag, tag),
                 "level": final_level, "id": f"{source_type}#{final_id}" if final_id else "-",
-                "desc": final_desc
+                "desc": final_desc,
+                "offset_start": t_start, "offset_len": t_len # offset 추가
             })
             i += 1
 
@@ -487,14 +516,33 @@ class SentenceGrader:
         return results
 
     def generate_ai_sentence(self, model, grades, keyword, hint=""):
-        prompt = "한국어 교육 전문가입니다.\n다음 조건에 맞춰 학습용 예문을 단 하나만 작성하세요.\n"
-        if grades:
-            valid = [int(g) for g in grades if g.isdigit()] if "all" not in grades else []
-            prompt += f"- 난이도: TOPIK {max(valid)}급 수준\n" if valid else "- 난이도: 초~고급 자연스럽게\n"
+        prompt = "당신은 한국어 어휘 및 난이도 전문 출제위원입니다.\n다음 조건에 맞춰 학습용 예문을 단 하나만 작성하세요.\n"
+        
+        target_levels = [int(g) for g in grades if g.isdigit()] if grades and "all" not in grades else []
+        
+        if target_levels:
+            max_lvl = max(target_levels)
+            prompt += f"\n[난이도 목표]: TOPIK {max_lvl}급 이하 (엄격 준수)\n"
+            
+            # [NEW] 등급별 구체적 가이드라인
+            if max_lvl <= 2:
+                prompt += "- 어휘: 기초적인 생활 어휘만 사용하세요.\n"
+                prompt += "- 문장 구조: 단문 위주의 아주 짧고 단순한 문장 (길이 최소화).\n"
+                prompt += "- 문법: 연결 어미나 파생어를 피하고, 아주 기본적인 조사만 사용하세요.\n"
+            elif max_lvl <= 4:
+                prompt += "- 어휘: 일상무 주제의 중급 어휘 사용.\n"
+                prompt += "- 문장 구조: 너무 복잡한 수식어구는 피하세요.\n"
+            else:
+                prompt += "- 어휘: 고급 어휘와 추상적 표현 사용 가능.\n"
+        else:
+            prompt += "- 난이도: 자연스러운 한국어 문장\n"
+
         if keyword:
             hint_str = f" (문맥 힌트: {hint})" if hint and hint != 'nan' else ""
-            prompt += f"- 필수 포함 단어: '{keyword}'{hint_str}\n  * 주의: 반드시 포함할 것.\n"
-        prompt += "\n[출력 제약사항]\n1. 설명 금지, 오직 예문 1개만 출력.\n2. 마크다운 사용 금지.\n3. 반드시 마침표로 끝낼 것."
+            prompt += f"\n- 필수 포함 단어: '{keyword}'{hint_str}\n  * 주의: 형태를 변형하지 말고 그대로 포함하세요.\n"
+        
+        prompt += "\n[출력 제약사항]\n1. 설명 금지, 오직 예문 1개만 출력.\n2. 마크다운, 따옴표, 불필요한 기호 사용 금지.\n3. 반드시 한국어 마침표(.)로 끝낼 것."
+        
         try:
             return model.generate_content(prompt).text.strip().replace("**", "").replace('"', "")
         except Exception as e: return f"오류: {str(e)}"
