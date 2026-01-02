@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
 <section>
-  <h2>🔮 등급별 예문 생성기 (스마트 검증)</h2>
+  <h2>🔮 생성</h2>
   <p>설정하신 등급에 맞지 않는 단어가 나오면, AI가 스스로 수정하여 다시 작성합니다.</p>
 
   <form method="post" class="form" id="generate-form">
@@ -9,13 +9,16 @@
     <fieldset>
       <legend>1. 원하는 등급 선택</legend>
       <div class="grade-grid">
-        <label><input type="checkbox" name="grades" value="all" id="check-irrelevant"> 무관</label>
-        <label><input type="checkbox" name="grades" value="1"> 1급</label>
-        <label><input type="checkbox" name="grades" value="2"> 2급</label>
-        <label><input type="checkbox" name="grades" value="3"> 3급</label>
-        <label><input type="checkbox" name="grades" value="4"> 4급</label>
-        <label><input type="checkbox" name="grades" value="5"> 5급</label>
-        <label><input type="checkbox" name="grades" value="6"> 6급</label>
+        <label
+          style="border-color: var(--primary-color); background: rgba(var(--primary-rgb), 0.1); margin-right: 15px;">
+          <input type="checkbox" id="check-all"> 모두
+        </label>
+        <label><input type="checkbox" name="grades" value="1" class="grade-cb"> 1급</label>
+        <label><input type="checkbox" name="grades" value="2" class="grade-cb"> 2급</label>
+        <label><input type="checkbox" name="grades" value="3" class="grade-cb"> 3급</label>
+        <label><input type="checkbox" name="grades" value="4" class="grade-cb"> 4급</label>
+        <label><input type="checkbox" name="grades" value="5" class="grade-cb"> 5급</label>
+        <label><input type="checkbox" name="grades" value="6" class="grade-cb"> 6급</label>
       </div>
     </fieldset>
 
@@ -149,6 +152,27 @@
       document.getElementById('common-search-input').value = '';
       document.getElementById('common-search-results').style.display = 'none';
     });
+
+    // [NEW] '모두' 체크박스 로직
+    const checkAll = document.getElementById('check-all');
+    const gradeCbs = document.querySelectorAll('.grade-cb');
+
+    if (checkAll) {
+      checkAll.addEventListener('change', function () {
+        const isChecked = this.checked;
+        gradeCbs.forEach(cb => cb.checked = isChecked);
+      });
+
+      gradeCbs.forEach(cb => {
+        cb.addEventListener('change', function () {
+          if (!this.checked) checkAll.checked = false;
+          else {
+            const allChecked = Array.from(gradeCbs).every(c => c.checked);
+            checkAll.checked = allChecked;
+          }
+        });
+      });
+    }
   });
 </script>
 
