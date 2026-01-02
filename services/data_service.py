@@ -1,15 +1,14 @@
 import pandas as pd
-from kiwipiepy import Kiwi
 import re
 import unicodedata
 import os
 
-class CorpusService:
+class DataService:
     _instance = None
 
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super(CorpusService, cls).__new__(cls)
+            cls._instance = super(DataService, cls).__new__(cls)
             cls._instance._initialized = False
         return cls._instance
 
@@ -18,15 +17,16 @@ class CorpusService:
         
         self.is_ready = False
         self.error_msg = ""
-        self.use_mock = False 
         self.word_df = None
         self.grammar_df = None
-        self.analyzer = None
         self.word_map = {}
         self.grammar_map = {}
         self.idiom_map = {}
         self.ida_entry = None
-
+        self.morph_service = None  # Dependency injection later or manual init? 
+                                   # Ideally passed or accessed. 
+                                   # For singleton, we can import or set it.
+        
         # 매핑 테이블 (Constants)
         self.pos_map = {
             'NNG': 'N', 'NNP': 'N', 'NR': 'N', 'NP': 'N', 
@@ -49,14 +49,20 @@ class CorpusService:
             'XPN': '체언 접두사', 'XSN': '명사 파생 접미사', 'XSV': '동사 파생 접미사', 'XSA': '형용사 파생 접미사',
             'XR': '어근', 'SF': '마침표', 'SP': '쉼표', 'SS': '따옴표/괄호', 'SE': '줄임표', 'SO': '붙임표', 'SW': '기타 기호'
         }
-
-        self._load_resources()
+        
         self._initialized = True
+
+    def initialize(self, morph_service):
+        """
+        Explicit initialization method to inject MorphService
+        and load resources.
+        """
+        self.morph_service = morph_service
+        self._load_resources()
 
     def _load_resources(self):
         try:
             # 1. 파일 경로 및 로드 (상위 디렉토리 기준)
-            # services/corpus_service.py -> ../ (project root)
             base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             word_path = os.path.join(base_dir, 'word.csv')
             grammar_path = os.path.join(base_dir, 'grammar.csv')
@@ -66,11 +72,6 @@ class CorpusService:
             self.word_df = pd.read_csv(word_path, encoding='utf-8')
             self.grammar_df = pd.read_csv(grammar_path, encoding='utf-8')
             self.grammar_df['search_related'] = self.grammar_df['관련형'].fillna('').apply(self._parse_related_forms)
-
-            try: self.analyzer = Kiwi()
-            except Exception as e:
-                print(f"⚠️ Kiwi 로드 실패: {e}")
-                self.analyzer = None; self.use_mock = True
 
             # '이다' 데이터
             try:
@@ -87,7 +88,7 @@ class CorpusService:
             self._build_lookup_tables()
             self.is_ready = True
         except Exception as e:
-            self.error_msg = str(e); print(f"CorpusService 초기화 오류: {self.error_msg}")
+            self.error_msg = str(e); print(f"DataService 초기화 오류: {self.error_msg}")
 
     def clean_key(self, key_str):
         key = str(key_str)
@@ -161,8 +162,12 @@ class CorpusService:
             pattern_chunks = clean_pat_str.split()
             valid_tokens = []
             try:
+                # Use injected MorphService to analyze chunks
+                analyzer = self.morph_service.get_analyzer()
+                if not analyzer: return # Cannot tokenize if no analyzer
+
                 for chunk in pattern_chunks:
-                    res = self.analyzer.analyze(chunk)
+                    res = analyzer.analyze(chunk)
                     tokens = res[0][0]
                     for idx, t in enumerate(tokens):
                         if chunk == pattern_chunks[-1] and idx == len(tokens) - 1 and t.form == '다' and t.tag == 'EF':
@@ -180,7 +185,9 @@ class CorpusService:
                         entry = data_dict.copy()
                         entry['is_main'] = True
                         self.idiom_map[start_key].append({'sequence': rest_seq, 'data': entry, 'full_text': raw_pattern})
-            except: pass
+            except Exception as e: 
+                # print(f"Idiom parsing error: {e}")
+                pass
 
         for _, row in self.grammar_df.fillna('').iterrows():
             data = {'level': row['등급'], 'uid': row['전체 번호'], 'desc': row.get('길잡이말', ''), 'meaning': row.get('의미', ''), 'class': str(row['분류'])}
