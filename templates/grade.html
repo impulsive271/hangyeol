@@ -24,13 +24,14 @@
   </form>
 
   <details style="margin-top: 1rem; margin-bottom: 2rem;">
-    <summary style="font-weight: bold; cursor: pointer;">📂 파일 업로드</summary>
+    <summary style="font-weight: bold; cursor: pointer;">📂 파일 업로드 (.txt)</summary>
     <div style="padding: 1rem; border: 1px solid var(--muted-border-color); border-radius: 8px; margin-top: 0.5rem;">
       <form action="{{ url_for('main.grade_upload') }}" method="post" enctype="multipart/form-data" class="grid"
-        style="grid-template-columns: 3fr 1fr; gap: 10px; margin-bottom:0; padding:0; border:none; box-shadow:none; background:transparent;">
-        <input type="file" name="file" accept=".txt,.csv,.xlsx" required>
+        style="grid-template-columns: 3fr 1fr; gap: 10px; margin-bottom:0; padding:0; border:none; box-shadow:none; background:transparent; backdrop-filter:none; -webkit-backdrop-filter:none;">
+        <input type="file" name="file" accept=".txt" required>
         <button type="submit" class="secondary">업로드 및 판독</button>
       </form>
+      <small style="color: var(--color-text-muted);">※ 현재 <strong>.txt</strong> 파일만 지원합니다.</small>
     </div>
   </details>
 
@@ -97,6 +98,47 @@
       console.error('복사 실패:', err);
       alert('복사 권한 오류. 다시 시도해주세요.');
     });
+  }
+
+  function downloadTableAsCsv() {
+    const table = document.getElementById('analysis-table');
+    if (!table) return;
+
+    let csvContent = "\uFEFF"; // BOM for Excel
+
+    // 헤더 (마지막 '수정' 컬럼 제외)
+    // analysis_table.html 구조상 th가 6개(마지막은 수정). 
+    // 하지만 copyTableText는 th.innerText를 그냥 다 가져오는 듯?
+    // th 구조 확인: 표제어, 품사, 등급, 번호, 길잡이말, 수정
+    // CSV에는 '수정' 컬럼이 필요 없으므로 제외하는 게 좋음.
+
+    const headers = Array.from(table.querySelectorAll('thead th'))
+      .slice(0, -1) // 마지막 컬럼 제외
+      .map(th => th.innerText);
+    csvContent += headers.join(',') + '\n';
+
+    // 본문
+    const rows = table.querySelectorAll('tbody tr');
+    rows.forEach(row => {
+      const cells = Array.from(row.querySelectorAll('td'))
+        .slice(0, -1) // 마지막 컬럼 제외
+        .map(td => {
+          let text = td.innerText.replace(/[\r\n]+/g, " ").trim();
+          // 쉼표가 있으면 따옴표로 감싸기
+          if (text.includes(',')) text = `"${text}"`;
+          return text;
+        });
+      csvContent += cells.join(',') + '\n';
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'analysis_result.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   // 기존 JS 유지
