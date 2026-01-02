@@ -1,5 +1,6 @@
-import re
-import pandas as pd
+import pandas as pd # Removed if unused, but check if needed. logic.py used it. Here it was used for excel.
+# Actually, I should remove `import pandas` if I don't use it.
+# Wait, I am replacing the method. I should also check imports.
 
 class FileProcessingService:
     def __init__(self):
@@ -7,29 +8,17 @@ class FileProcessingService:
 
     def extract_text_from_file(self, file) -> str:
         """
-        업로드된 파일(.txt, .xlsx, .csv)에서 텍스트를 추출하여 하나의 문자열로 반환합니다.
+        업로드된 파일(.txt)에서 텍스트를 추출하여 하나의 문자열로 반환합니다.
+        지원 형식: .txt
         """
         try:
             full_text = ""
 
-            # A. 텍스트 파일 (.txt) 
+            # 텍스트 파일 (.txt) 
             if file.filename.lower().endswith('.txt'):
                 full_text = file.read().decode('utf-8')
-
-            # B. 엑셀/CSV 파일 (.xlsx, .csv)
             else:
-                df = pd.read_excel(file) if file.filename.endswith('.xlsx') else pd.read_csv(file, encoding='utf-8')
-                
-                # '문장' 또는 'sentence' 컬럼 찾기
-                target_col = next((c for c in df.columns if '문장' in str(c) or 'sentence' in str(c).lower()), None)
-                
-                if target_col:
-                    # 모든 행의 해당 컬럼 값을 가져와 줄바꿈으로 연결
-                    sentences = df[target_col].astype(str).tolist()
-                    full_text = "\n".join(sentences)
-                else:
-                    # 컬럼을 못 찾으면 첫 번째 컬럼 사용 (fallback)
-                    full_text = "\n".join(df.iloc[:, 0].astype(str).tolist())
+                raise Exception("지원되지 않는 파일 형식입니다. .txt 파일만 가능합니다.")
             
             return full_text.strip()
 
