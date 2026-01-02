@@ -16,6 +16,7 @@
     <table id="analysis-table" class="striped">
         <thead>
             <tr>
+                <th scope="col" style="width: 12%;">파일명</th>
                 <th scope="col" style="width: 15%;">표제어</th>
                 <th scope="col" style="width: 20%;">품사</th>
                 <th scope="col" style="width: 10%;">등급</th>
@@ -27,7 +28,12 @@
         <tbody>
             {% for row in analysis_result %}
             <tr data-original-form="{{ row.form }}" data-tag-code="{{ row.tag_code }}"
-                data-offset="{{ row.offset_start }}" data-ui-id="{{ row._ui_id }}">
+                data-offset="{{ row.offset_start }}" data-ui-id="{{ row._ui_id }}" data-filename="{{ row.filename }}">
+                <td class="cell-filename"
+                    style="color: var(--color-primary); font-size: 0.9rem; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px;"
+                    title="{{ row.filename }}">
+                    {{ row.filename|default('-') }}
+                </td>
                 <td class="cell-form" style="font-weight: bold; color: var(--color-text);">{{ row.form }}</td>
                 <td class="cell-pos">
                     <span data-tooltip="{{ row.tag_code }}" style="border-bottom: 1px dotted #888; cursor: help;">
