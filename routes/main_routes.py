@@ -25,11 +25,11 @@ def grade():
 
     if request.method == "POST":
         last_sentence = request.form.get("sentence", "")
-        graded_text, analysis_result, debug_log = analysis_service.get_sentence_grade(last_sentence)
+        grade_stats, analysis_result, debug_log = analysis_service.get_sentence_grade(last_sentence)
         visualization_data, text_segments = analysis_service.get_visualization_data(analysis_result, last_sentence)
 
     return render_template("grade.html", 
-                           graded_text=graded_text, 
+                           grade_stats=grade_stats, 
                            analysis_result=analysis_result, 
                            last_sentence=last_sentence,
                            debug_log=debug_log,
@@ -48,12 +48,12 @@ def grade_upload():
             extracted_text = file_service.extract_text_from_file(file)
             
             # 분석 실행
-            graded_text, analysis_result, debug_log = analysis_service.get_sentence_grade(extracted_text)
+            grade_stats, analysis_result, debug_log = analysis_service.get_sentence_grade(extracted_text)
             visualization_data, text_segments = analysis_service.get_visualization_data(analysis_result, extracted_text)
             
             # grade.html 렌더링 (텍스트 입력창에 추출된 내용 채움)
             return render_template("grade.html", 
-                           graded_text=graded_text, 
+                           grade_stats=grade_stats, 
                            analysis_result=analysis_result, 
                            last_sentence=extracted_text,
                            debug_log=debug_log,

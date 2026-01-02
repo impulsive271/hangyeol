@@ -1,11 +1,11 @@
 from flask import Blueprint, request, jsonify
-from services.data_service import DataService
+from services.grade_database import GradeDatabase
 from services.analysis_service import AnalysisService
 from services.quiz_service import QuizService
 
 api_bp = Blueprint('api', __name__)
 
-data_service = DataService()
+grade_database = GradeDatabase()
 analysis_service = AnalysisService()
 quiz_service = QuizService()
 
@@ -13,7 +13,7 @@ quiz_service = QuizService()
 def search_keyword():
     query = request.args.get("q", "").strip()
     search_type = request.args.get("type", "word")
-    return jsonify(data_service.search_keyword(query, search_type))
+    return jsonify(grade_database.search_keyword(query, search_type))
 
 @api_bp.route('/analyze_sentence_for_quiz', methods=['POST'])
 def analyze_sentence_for_quiz():

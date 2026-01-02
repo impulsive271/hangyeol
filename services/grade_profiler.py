@@ -1,9 +1,9 @@
 import re
 import json
-from services.data_service import DataService
+from services.grade_database import GradeDatabase
 
 class GradeProfiler:
-    def __init__(self, data_service: DataService):
+    def __init__(self, data_service: GradeDatabase):
         self.data = data_service
         self.debug_lines = []
 

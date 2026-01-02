@@ -37,25 +37,67 @@
 
   <hr style="margin: 2rem 0; border-color: var(--muted-border-color);">
 
-  {% if graded_text %}
+  {% if grade_stats %}
   <article class="result-card">
     <header>
       <strong style="font-size: 1.3rem;">판독 결과</strong>
     </header>
 
-    <div class="grade-display" style="font-size: 1.6rem; margin: 1.5rem 0; line-height: 1.4;">
-      <span id="overall-grade-text">{{ graded_text }}</span>
+    <!-- [NEW] 등급 빈도수 테이블 -->
+    <div style="margin: 1.5rem 0; overflow-x: auto; text-align: center;">
+      <table role="grid" style="text-align: center; width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr style="border-bottom: 1px solid var(--muted-border-color);">
+            <th style="padding: 10px;"><span
+                style="display:inline-block; border-radius:12px; background-color:#10b981; color:#fff; padding:4px 12px; white-space:nowrap;">1급</span>
+            </th>
+            <th style="padding: 10px;"><span
+                style="display:inline-block; border-radius:12px; background-color:#3b82f6; color:#fff; padding:4px 12px; white-space:nowrap;">2급</span>
+            </th>
+            <th style="padding: 10px;"><span
+                style="display:inline-block; border-radius:12px; background-color:#8b5cf6; color:#fff; padding:4px 12px; white-space:nowrap;">3급</span>
+            </th>
+            <th style="padding: 10px;"><span
+                style="display:inline-block; border-radius:12px; background-color:#f59e0b; color:#fff; padding:4px 12px; white-space:nowrap;">4급</span>
+            </th>
+            <th style="padding: 10px;"><span
+                style="display:inline-block; border-radius:12px; background-color:#ef4444; color:#fff; padding:4px 12px; white-space:nowrap;">5급</span>
+            </th>
+            <th style="padding: 10px;"><span
+                style="display:inline-block; border-radius:12px; background-color:#64748b; color:#fff; padding:4px 12px; white-space:nowrap;">6급</span>
+            </th>
+            <th style="padding: 10px;"><span
+                style="display:inline-block; border-radius:12px; background-color:#94a3b8; color:#fff; padding:4px 12px; white-space:nowrap;">등급
+                없음</span></th>
+            <th style="padding: 10px;"><span
+                style="display:inline-block; border-radius:12px; background-color:#475569; color:#fff; padding:4px 12px; white-space:nowrap;">기타</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="font-size: 1.2rem; font-weight: bold;">
+            <td style="padding: 10px;">{{ grade_stats['1급'] }}</td>
+            <td style="padding: 10px;">{{ grade_stats['2급'] }}</td>
+            <td style="padding: 10px;">{{ grade_stats['3급'] }}</td>
+            <td style="padding: 10px;">{{ grade_stats['4급'] }}</td>
+            <td style="padding: 10px;">{{ grade_stats['5급'] }}</td>
+            <td style="padding: 10px;">{{ grade_stats['6급'] }}</td>
+            <td style="padding: 10px;">{{ grade_stats['등급 없음'] }}</td>
+            <td style="padding: 10px;">{{ grade_stats['기타'] }}</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     {% if analysis_result %}
 
-    <!-- [MODIFIED] 모듈화된 분석 테이블 컴포넌트 사용 -->
-    {% include 'components/analysis_table.html' %}
-
-    <!-- [NEW] 시각화 섹션 (원그래프 + 하이라이트 원문) -->
+    <!-- [MOVED] 시각화 섹션 (원그래프 + 하이라이트 원문) - 우선 순위 변경 -->
     {% if visualization_data %}
     {% include 'components/visualization.html' %}
     {% endif %}
+
+    <!-- [MOVED] 모듈화된 분석 테이블 컴포넌트 -->
+    {% include 'components/analysis_table.html' %}
 
     {% endif %}
   </article>
