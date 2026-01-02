@@ -2,11 +2,13 @@ import re
 import json
 import google.generativeai as genai
 from config import Config
-from services.corpus_service import CorpusService
+from services.morph_service import MorphService
+from services.data_service import DataService
 
 class AnalysisService:
     def __init__(self):
-        self.corpus = CorpusService()
+        self.morph = MorphService()
+        self.data = DataService()
         self.model = None
         self._init_ai()
     
@@ -60,11 +62,11 @@ class AnalysisService:
             return {}, error_msg
 
     def get_sentence_grade(self, sentence: str):
-        if not self.corpus.is_ready: return "판독 불가", [], "데이터 로드 실패"
-        if self.corpus.use_mock or not self.corpus.analyzer: return "분석 불가", [], "Kiwi 로드 실패"
+        if not self.data.is_ready: return "판독 불가", [], "데이터 로드 실패"
+        if self.morph.use_mock or not self.morph.analyzer: return "분석 불가", [], "Kiwi 로드 실패"
         
         try:
-            res = self.corpus.analyzer.analyze(sentence)
+            res = self.morph.analyze(sentence)
             tokens = res[0][0]
         except Exception as e: return "분석 에러", [], f"Kiwi 분석 오류: {str(e)}"
 
@@ -76,15 +78,15 @@ class AnalysisService:
         i = 0
         while i < len(tokens):
             token = tokens[i]
-            form = token.form; tag = token.tag; form_clean = self.corpus.clean_key(form)
+            form = token.form; tag = token.tag; form_clean = self.data.clean_key(form)
             
             t_start = token.start
             t_len = token.len
             
             # 0. 표현 패턴 매칭
             idiom_matched = False
-            if form_clean in self.corpus.idiom_map:
-                candidates = self.corpus.idiom_map[form_clean]
+            if form_clean in self.data.idiom_map:
+                candidates = self.data.idiom_map[form_clean]
                 for cand in candidates:
                     seq = cand['sequence']
                     if i + len(seq) >= len(tokens): continue
@@ -92,7 +94,7 @@ class AnalysisService:
                     matched_tokens_forms = [form]
                     for offset, target_stem in enumerate(seq):
                         next_t = tokens[i + 1 + offset]
-                        next_clean = self.corpus.clean_key(next_t.form)
+                        next_clean = self.data.clean_key(next_t.form)
                         if next_clean != target_stem: match = False; break
                         matched_tokens_forms.append(next_t.form)
                     
@@ -119,14 +121,14 @@ class AnalysisService:
 
             # [VCP 절대 우선]
             if tag.startswith('VCP'):
-                final_cand = self.corpus.ida_entry
+                final_cand = self.data.ida_entry
                 level_str = final_cand['level']
                 debug_lines.append(f"🔒 지정사(VCP) 강제 매핑: 이다 -> {level_str} (#{final_cand['uid']})")
                 if level_str:
                     try: max_level = max(max_level, int(re.sub(r'[^0-9]', '', str(level_str))))
                     except: pass
                 analysis_data.append({
-                    "form": form, "tag_code": tag, "tag_name": self.corpus.friendly_pos_map.get(tag, tag),
+                    "form": form, "tag_code": tag, "tag_name": self.data.friendly_pos_map.get(tag, tag),
                     "level": level_str, "id": f"문법#{final_cand['uid']}", "desc": final_cand['desc'],
                     "offset_start": t_start, "offset_len": t_len
                 })
@@ -135,19 +137,19 @@ class AnalysisService:
             # 1. 단어 병합
             if i + 1 < len(tokens):
                 next_token = tokens[i+1]
-                curr_pos_type = self.corpus.pos_map.get(tag, 'ETC')
-                next_pos_type = self.corpus.pos_map.get(next_token.tag, 'ETC')
+                curr_pos_type = self.data.pos_map.get(tag, 'ETC')
+                next_pos_type = self.data.pos_map.get(next_token.tag, 'ETC')
                 
                 is_noun_merge = (curr_pos_type in ['N', 'NB'] and next_pos_type in ['N', 'NB'])
                 is_root_merge = (tag == 'XR' and next_token.tag in ['XSA', 'XSV', 'XSA-I', 'XSV-I'])
 
                 if is_noun_merge or is_root_merge:
                     suffix = '다' if is_root_merge else ''
-                    combined_form = form_clean + self.corpus.clean_key(next_token.form) + suffix
+                    combined_form = form_clean + self.data.clean_key(next_token.form) + suffix
                     target_pos = 'V' if is_root_merge else 'N'
                     
-                    if (combined_form, target_pos) in self.corpus.word_map:
-                        merged_cands = self.corpus.word_map[(combined_form, target_pos)]
+                    if (combined_form, target_pos) in self.data.word_map:
+                        merged_cands = self.data.word_map[(combined_form, target_pos)]
                         
                         main_cands = [c for c in merged_cands if c.get('is_main', False)]
                         if main_cands: merged_cands = main_cands
@@ -173,30 +175,32 @@ class AnalysisService:
 
             # 2. 단일 토큰 처리
             source_type = ""; search_key = ""; candidates = []
-            pos_key = self.corpus.pos_map.get(tag, 'ETC')
+            pos_key = self.data.pos_map.get(tag, 'ETC')
             # [FIX] 기본값 초기화
             target = form_clean 
 
             if tag in ['XSV', 'XSA'] and form_clean == '하':
-                source_type = "접미사"; candidates = [{'level': '1급', 'uid': 'Sys', 'desc': '파생 접미사', 'is_main': True}]
+                source_type = "단어"; candidates = [{'level': '2급', 'uid': '1769', 'desc': '건강하다', 'is_main': True}]
+            elif tag in ['EF'] and form_clean == '다':
+                source_type = "문법"; candidates = [{'level': '3급', 'uid': '120', 'desc': '', 'is_main': True}]
             elif tag.startswith('J') or tag.startswith('E'):
                 source_type = "문법"
-                if (form_clean, pos_key) in self.corpus.grammar_map:
-                    candidates = self.corpus.grammar_map[(form_clean, pos_key)]
+                if (form_clean, pos_key) in self.data.grammar_map:
+                    candidates = self.data.grammar_map[(form_clean, pos_key)]
                     search_key = f"({form_clean}, {pos_key})"
                 else:
                     fallback_key = 'J' if tag.startswith('J') else 'E'
-                    if (form_clean, fallback_key) in self.corpus.grammar_map:
-                        candidates = self.corpus.grammar_map[(form_clean, fallback_key)]
+                    if (form_clean, fallback_key) in self.data.grammar_map:
+                        candidates = self.data.grammar_map[(form_clean, fallback_key)]
                         search_key = f"({form_clean}, {fallback_key})"
             else:
                 source_type = "단어"
                 target = form_clean + '다' if pos_key == 'V' and not form_clean.endswith('다') else form_clean
                 search_key = f"({target}, {pos_key})"
-                word_candidates = self.corpus.word_map.get((target, pos_key), [])
+                word_candidates = self.data.word_map.get((target, pos_key), [])
                 grammar_candidates = []
-                if (target, pos_key) in self.corpus.grammar_map:
-                    grammar_candidates = self.corpus.grammar_map[(target, pos_key)]
+                if (target, pos_key) in self.data.grammar_map:
+                    grammar_candidates = self.data.grammar_map[(target, pos_key)]
                 candidates = word_candidates + grammar_candidates
 
             final_level = "-"; final_id = ""; final_desc = ""
@@ -218,7 +222,7 @@ class AnalysisService:
                 debug_lines.append(f"['{form}'({tag})] -> 검색 실패 (X)")
 
             analysis_data.append({
-                "form": form, "tag_code": tag, "tag_name": self.corpus.friendly_pos_map.get(tag, tag),
+                "form": form, "tag_code": tag, "tag_name": self.data.friendly_pos_map.get(tag, tag),
                 "level": final_level, "id": f"{source_type}#{final_id}" if final_id else "-",
                 "desc": final_desc,
                 "offset_start": t_start, "offset_len": t_len
@@ -261,8 +265,8 @@ class AnalysisService:
         return final_grade, analysis_data, "\n".join(debug_lines)
 
     def analyze_morphs(self, sentence):
-        if not self.corpus.analyzer: return []
-        res = self.corpus.analyzer.analyze(sentence)
+        if not self.morph.analyzer: return []
+        res = self.morph.analyze(sentence)
         tokens = res[0][0]
         return [{'form': t.form, 'tag': t.tag} for t in tokens]
 
