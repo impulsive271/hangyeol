@@ -28,7 +28,7 @@
     <div style="padding: 1rem; border: 1px solid var(--muted-border-color); border-radius: 8px; margin-top: 0.5rem;">
       <form action="{{ url_for('main.grade_upload') }}" method="post" enctype="multipart/form-data" class="grid"
         style="grid-template-columns: 3fr 1fr; gap: 10px; margin-bottom:0; padding:0; border:none; box-shadow:none; background:transparent; backdrop-filter:none; -webkit-backdrop-filter:none;">
-        <input type="file" name="file" accept=".txt" required>
+        <input type="file" name="file" accept=".txt" multiple required>
         <button type="submit" class="secondary">업로드 및 판독</button>
       </form>
       <small style="color: var(--color-text-muted);">※ 현재 <strong>.txt</strong> 파일만 지원합니다.</small>
@@ -37,7 +37,7 @@
 
   <hr style="margin: 2rem 0; border-color: var(--muted-border-color);">
 
-  {% if grade_stats %}
+  {% if file_stats_list %}
   <article class="result-card">
     <header>
       <strong style="font-size: 1.3rem;">판독 결과</strong>
@@ -48,6 +48,7 @@
       <table role="grid" style="text-align: center; width: 100%; border-collapse: collapse;">
         <thead>
           <tr style="border-bottom: 1px solid var(--muted-border-color);">
+            <th style="padding: 10px; min-width: 120px;">파일명</th>
             <th style="padding: 10px;"><span
                 style="display:inline-block; border-radius:12px; background-color:#10b981; color:#fff; padding:4px 12px; white-space:nowrap;">1급</span>
             </th>
@@ -75,16 +76,21 @@
           </tr>
         </thead>
         <tbody>
-          <tr style="font-size: 1.2rem; font-weight: bold;">
-            <td style="padding: 10px;">{{ grade_stats['1급'] }}</td>
-            <td style="padding: 10px;">{{ grade_stats['2급'] }}</td>
-            <td style="padding: 10px;">{{ grade_stats['3급'] }}</td>
-            <td style="padding: 10px;">{{ grade_stats['4급'] }}</td>
-            <td style="padding: 10px;">{{ grade_stats['5급'] }}</td>
-            <td style="padding: 10px;">{{ grade_stats['6급'] }}</td>
-            <td style="padding: 10px;">{{ grade_stats['등급 없음'] }}</td>
-            <td style="padding: 10px;">{{ grade_stats['기타'] }}</td>
+          {% for item in file_stats_list %}
+          <tr style="font-size: 1.1rem; border-bottom: 1px solid rgba(0,0,0,0.05);">
+            <td
+              style="padding: 10px; font-weight:bold; color:var(--color-primary); white-space: nowrap; max-width: 150px; overflow: hidden; text-overflow: ellipsis;"
+              title="{{ item.filename }}">{{ item.filename }}</td>
+            <td style="padding: 10px;">{{ item.stats['1급'] }}</td>
+            <td style="padding: 10px;">{{ item.stats['2급'] }}</td>
+            <td style="padding: 10px;">{{ item.stats['3급'] }}</td>
+            <td style="padding: 10px;">{{ item.stats['4급'] }}</td>
+            <td style="padding: 10px;">{{ item.stats['5급'] }}</td>
+            <td style="padding: 10px;">{{ item.stats['6급'] }}</td>
+            <td style="padding: 10px;">{{ item.stats['등급 없음'] }}</td>
+            <td style="padding: 10px;">{{ item.stats['기타'] }}</td>
           </tr>
+          {% endfor %}
         </tbody>
       </table>
     </div>

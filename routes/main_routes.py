@@ -16,7 +16,7 @@ def index():
 
 @main_bp.route("/grade", methods=["GET", "POST"])
 def grade():
-    graded_text = None
+    file_stats_list = []
     analysis_result = [] 
     last_sentence = ""
     debug_log = "" 
@@ -26,10 +26,16 @@ def grade():
     if request.method == "POST":
         last_sentence = request.form.get("sentence", "")
         grade_stats, analysis_result, debug_log = analysis_service.get_sentence_grade(last_sentence)
+        
+        # [MODIFIED] 직접 입력 시에도 파일명 '직접 입력'으로 통일
+        file_stats_list = [{'filename': '직접 입력', 'stats': grade_stats}]
+        for item in analysis_result:
+            item['filename'] = '직접 입력'
+            
         visualization_data, text_segments = analysis_service.get_visualization_data(analysis_result, last_sentence)
 
     return render_template("grade.html", 
-                           grade_stats=grade_stats, 
+                           file_stats_list=file_stats_list, 
                            analysis_result=analysis_result, 
                            last_sentence=last_sentence,
                            debug_log=debug_log,
@@ -39,29 +45,53 @@ def grade():
 @main_bp.route("/grade/upload", methods=["POST"])
 def grade_upload():
     if 'file' not in request.files: return "파일 없음", 400
-    file = request.files['file']
-    if file.filename == '': return "파일 이름 없음", 400
     
-    if file:
-        try:
+    files = request.files.getlist('file')
+    if not files or files[0].filename == '': return "파일 이름 없음", 400
+    
+    file_stats_list = []
+    combined_analysis_result = []
+    combined_text = []
+    full_debug_log = ""
+
+    try:
+        for file in files:
+            if not file: continue
+            filename = file.filename
+            
             # 파일에서 텍스트 추출
             extracted_text = file_service.extract_text_from_file(file)
             
             # 분석 실행
             grade_stats, analysis_result, debug_log = analysis_service.get_sentence_grade(extracted_text)
-            visualization_data, text_segments = analysis_service.get_visualization_data(analysis_result, extracted_text)
             
-            # grade.html 렌더링 (텍스트 입력창에 추출된 내용 채움)
-            return render_template("grade.html", 
-                           grade_stats=grade_stats, 
-                           analysis_result=analysis_result, 
-                           last_sentence=extracted_text,
-                           debug_log=debug_log,
-                           visualization_data=visualization_data,
-                           text_segments=text_segments)
+            # [NEW] 파일별 통계 저장
+            file_stats_list.append({'filename': filename, 'stats': grade_stats})
+            
+            # [NEW] 분석 결과에 파일명 추가
+            for item in analysis_result:
+                item['filename'] = filename
+                
+            combined_analysis_result.extend(analysis_result)
+            combined_text.append(f"[{filename}]\n{extracted_text}")
+            full_debug_log += f"--- {filename} ---\n{debug_log}\n"
 
-        except Exception as e:
-            return f"파일 처리 중 오류 발생: {e}", 500
+        full_extracted_text = "\n\n".join(combined_text)
+        
+        # 시각화 데이터 (전체 합산 기준)
+        visualization_data, text_segments = analysis_service.get_visualization_data(combined_analysis_result, full_extracted_text)
+        
+        # grade.html 렌더링
+        return render_template("grade.html", 
+                       file_stats_list=file_stats_list, 
+                       analysis_result=combined_analysis_result, 
+                       last_sentence=full_extracted_text,
+                       debug_log=full_debug_log,
+                       visualization_data=visualization_data,
+                       text_segments=text_segments)
+
+    except Exception as e:
+        return f"파일 처리 중 오류 발생: {e}", 500
 
 @main_bp.route("/generate", methods=["GET", "POST"])
 def generate():
