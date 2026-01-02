@@ -3,13 +3,13 @@ import json
 import google.generativeai as genai
 from config import Config
 from services.morph_service import MorphService
-from services.data_service import DataService
+from services.grade_database import GradeDatabase
 from services.grade_profiler import GradeProfiler
 
 class AnalysisService:
     def __init__(self):
         self.morph = MorphService()
-        self.data = DataService()
+        self.data = GradeDatabase()
         self.profiler = GradeProfiler(self.data)
         self.model = None
         self._init_ai()
@@ -38,8 +38,32 @@ class AnalysisService:
         # Delegate to GradeProfiler
         analysis_data, max_level, debug_log = self.profiler.profile(tokens, sentence, self.model)
 
-        final_grade = f"{max_level}급" if max_level > 0 else "판별 불가"
-        return final_grade, analysis_data, debug_log
+        # [MODIFIED] 단순 등급 산정 대신 빈도수 집계
+        grade_stats = {f"{i}급": 0 for i in range(1, 7)}
+        grade_stats["등급 없음"] = 0
+        grade_stats["기타"] = 0
+        
+        for item in analysis_data:
+            lvl = item.get('level', '')
+            tag = item.get('tag_code', '')
+            
+            # [NEW] 문장 부호(S로 시작) 등은 '기타'로 분류
+            if tag and tag.startswith('S'):
+                grade_stats["기타"] += 1
+                continue
+
+            if lvl and '급' in lvl:
+                # "1급", "1~2급" 등 처리 (심플하게 첫 숫자 기준)
+                found = re.search(r'([1-6])급', lvl)
+                if found:
+                    grade_stats[f"{found.group(1)}급"] += 1
+                else:
+                    grade_stats["등급 없음"] += 1
+            else:
+                 grade_stats["등급 없음"] += 1
+
+        # Use grade_stats as the first return value instead of single grade string
+        return grade_stats, analysis_data, debug_log
 
     def analyze_morphs(self, sentence):
         if not self.morph.analyzer: return []

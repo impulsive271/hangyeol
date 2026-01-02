@@ -1,7 +1,7 @@
 from flask import Flask
 from config import Config
 from services.morph_service import MorphService
-from services.data_service import DataService
+from services.grade_database import GradeDatabase
 from routes.main_routes import main_bp
 from routes.api_routes import api_bp
 
@@ -10,8 +10,8 @@ app.config.from_object(Config)
 
 # Initialize Services
 morph_service = MorphService()
-data_service = DataService()
-data_service.initialize(morph_service)
+grade_database = GradeDatabase()
+grade_database.initialize(morph_service)
 
 # Register Blueprints
 app.register_blueprint(main_bp)
