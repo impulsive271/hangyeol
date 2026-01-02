@@ -1,14 +1,14 @@
 from flask import Blueprint, render_template, request, send_file
-import io
-import pandas as pd
-import re
 from services.analysis_service import AnalysisService
 from services.generation_service import GenerationService
+
+from services.file_processing_service import FileProcessingService
 
 main_bp = Blueprint('main', __name__)
 
 analysis_service = AnalysisService()
 generation_service = GenerationService()
+file_service = FileProcessingService()
 
 @main_bp.route("/")
 def index():
@@ -44,49 +44,21 @@ def grade_upload():
     
     if file:
         try:
-            processed_data = []
-
-            # A. 텍스트 파일 (.txt) 
-            if file.filename.lower().endswith('.txt'):
-                content = file.read().decode('utf-8')
-                sentences = re.split(r'(?<=[.?!])\s+', content)
-                clean_sentences = [s.strip() for s in sentences if s.strip()]
-
-                for sentence in clean_sentences:
-                    grade_result, analysis_list, _ = analysis_service.get_sentence_grade(sentence)
-                    processed_data.append({
-                        "일괄 판독문장": sentence,
-                        "판독등급": grade_result,
-                        "상세로그": str(analysis_list) 
-                    })
-
-            # B. 엑셀/CSV 파일 (.xlsx, .csv)
-            else:
-                df = pd.read_excel(file) if file.filename.endswith('.xlsx') else pd.read_csv(file, encoding='utf-8')
-                target_col = next((c for c in df.columns if '문장' in str(c) or 'sentence' in str(c).lower()), df.columns[0])
-                
-                for _, row in df.iterrows():
-                    sentence = str(row[target_col])
-                    grade_result, analysis_list, _ = analysis_service.get_sentence_grade(sentence)
-                    processed_data.append({
-                        "일괄 판독문장": sentence,
-                        "판독등급": grade_result,
-                        "상세로그": str(analysis_list)
-                    })
+            # 파일에서 텍스트 추출
+            extracted_text = file_service.extract_text_from_file(file)
             
-            result_df = pd.DataFrame(processed_data)
-            result_df = result_df[['일괄 판독문장', '판독등급', '상세로그']]
-
-            output = io.BytesIO()
-            result_df.to_csv(output, index=False, encoding='utf-8-sig')
-            output.seek(0)
+            # 분석 실행
+            graded_text, analysis_result, debug_log = analysis_service.get_sentence_grade(extracted_text)
+            visualization_data, text_segments = analysis_service.get_visualization_data(analysis_result, extracted_text)
             
-            return send_file(
-                output, 
-                mimetype='text/csv', 
-                as_attachment=True, 
-                download_name='graded_result.csv'
-            )
+            # grade.html 렌더링 (텍스트 입력창에 추출된 내용 채움)
+            return render_template("grade.html", 
+                           graded_text=graded_text, 
+                           analysis_result=analysis_result, 
+                           last_sentence=extracted_text,
+                           debug_log=debug_log,
+                           visualization_data=visualization_data,
+                           text_segments=text_segments)
 
         except Exception as e:
             return f"파일 처리 중 오류 발생: {e}", 500

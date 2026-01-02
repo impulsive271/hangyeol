@@ -23,6 +23,17 @@
     <button type="submit">판독하기</button>
   </form>
 
+  <details style="margin-top: 1rem; margin-bottom: 2rem;">
+    <summary style="font-weight: bold; cursor: pointer;">📂 파일 업로드</summary>
+    <div style="padding: 1rem; border: 1px solid var(--muted-border-color); border-radius: 8px; margin-top: 0.5rem;">
+      <form action="{{ url_for('main.grade_upload') }}" method="post" enctype="multipart/form-data" class="grid"
+        style="grid-template-columns: 3fr 1fr; gap: 10px; margin-bottom:0; padding:0; border:none; box-shadow:none; background:transparent;">
+        <input type="file" name="file" accept=".txt,.csv,.xlsx" required>
+        <button type="submit" class="secondary">업로드 및 판독</button>
+      </form>
+    </div>
+  </details>
+
   <hr style="margin: 2rem 0; border-color: var(--muted-border-color);">
 
   {% if graded_text %}
@@ -49,16 +60,7 @@
   </article>
   {% endif %}
 
-  <details style="margin-top: 1rem;">
-    <summary style="font-weight: bold; cursor: pointer;">📂 대량 판독 모드 (파일 업로드)</summary>
-    <div style="padding: 1rem; border: 1px solid var(--muted-border-color); border-radius: 8px; margin-top: 0.5rem;">
-      <form action="{{ url_for('main.grade_upload') }}" method="post" enctype="multipart/form-data" class="grid"
-        style="grid-template-columns: 3fr 1fr; gap: 10px; margin-bottom:0; padding:0; border:none; box-shadow:none; background:transparent;">
-        <input type="file" name="file" accept=".txt" required>
-        <button type="submit" class="secondary">일괄 판독</button>
-      </form>
-    </div>
-  </details>
+
 
   {% if debug_log %}
   <details style="margin-top: 0.5rem;">
