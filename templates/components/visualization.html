@@ -5,7 +5,7 @@
 
     <!-- 1. 탭 네비게이션 -->
     <div class="nav-tabs">
-        <button class="nav-tab active" onclick="openVizTab(event, 'tab-overall')">종합 분포</button>
+        <button class="nav-tab active" onclick="openVizTab(event, 'tab-overall')">원그래프</button>
         <button class="nav-tab" onclick="openVizTab(event, 'tab-comparison')">비율막대그림</button>
         <button class="nav-tab" onclick="openVizTab(event, 'tab-absolute')">빈도막대그림</button>
     </div>
@@ -15,9 +15,40 @@
 
         <!-- Tab 1: 종합 분포 (기존 원그래프) -->
         <div id="tab-overall" class="viz-tab-pane active" style="display: block;">
-            <h3 style="margin-bottom: 1rem; font-weight: 700;">🍰 종합 등급 분포</h3>
-            <div style="max-width: 500px; margin: 0 auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0; font-weight: 700;">🍰 등급 분포 원그래프</h3>
+
+                <!-- [NEW] 통합/개별 토글 스위치 -->
+                <div class="toggle-container" style="font-size: 0.9rem; display: flex; align-items: center; gap: 15px;">
+                    <div style="margin-right: 15px;">
+                        <label style="cursor: pointer; margin-right: 10px;">
+                            <input type="radio" name="pie-mode" value="integrated" checked
+                                onchange="togglePieMode(this.value)">
+                            통합
+                        </label>
+                        <label style="cursor: pointer;">
+                            <input type="radio" name="pie-mode" value="individual" onchange="togglePieMode(this.value)">
+                            개별
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 통합 차트 영역 -->
+            <div id="integrated-chart-area" style="max-width: 500px; margin: 0 auto; display: block;">
                 <div id="gradeChart"></div>
+            </div>
+
+            <!-- [NEW] Shared Legend Container (Initially Hidden) -->
+            <div id="shared-pie-legend"
+                style="display: none; justify-content: center; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
+                <!-- JS will populate this -->
+            </div>
+
+            <!-- [NEW] 개별 차트 영역 (Grid Layout) -->
+            <div id="individual-charts-container"
+                style="display: none; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
+                <!-- JS로 동적 생성됨 -->
             </div>
         </div>
 
@@ -133,6 +164,11 @@
     let comparisonChartInstance = null; // Ratio Bar Chart instance
     let absoluteChartInstance = null; // Absolute Bar Chart instance
 
+    // [New] Global Data Variables
+    let globalInitialLabels = [];
+    let globalInitialData = [];
+    let globalFileStats = [];
+
     // 탭 전환 함수
     window.openVizTab = function (evt, tabId) {
         // 1. 모든 탭 콘텐츠 숨김
@@ -159,46 +195,22 @@
         } else if (tabId === 'tab-absolute' && absoluteChartInstance) {
             absoluteChartInstance.reflow();
         }
+        // 개별 차트도 리사이즈
+        if (tabId === 'tab-overall') {
+            const individualContainer = document.getElementById('individual-charts-container');
+            if (individualContainer.style.display !== 'none') {
+                Highcharts.charts.forEach(chart => {
+                    if (chart && chart.options.chart.type === 'pie') {
+                        chart.reflow();
+                    }
+                });
+            }
+        }
     };
 
     // Global function to refresh chart from table data (Legacy support for Donut)
     window.refreshGradeChart = function () {
-        console.log("[refreshGradeChart] Called.");
-        // (기존 로직 유지 - 분석 테이블에서 데이터 읽어서 원그래프 업데이트)
-        // ... (필요 시 유지, 복잡성을 줄이기 위해 일단 기존 로직 활용)
-        if (!gradeChartInstance) return;
-
-        // ... 기존 refreshGradeChart 로직 복사 ...
-        const gradeCounts = { '1급': 0, '2급': 0, '3급': 0, '4급': 0, '5급': 0, '6급': 0 };
-        const rows = document.querySelectorAll('#analysis-table tbody tr');
-        let maxGrade = 0;
-        if (rows.length === 0) return;
-        rows.forEach(row => {
-            const gradeBadge = row.querySelector('.grade-badge');
-            if (gradeBadge) {
-                const gradeText = gradeBadge.innerText.trim();
-                if (gradeCounts[gradeText] !== undefined) {
-                    gradeCounts[gradeText]++;
-                    const levelNum = parseInt(gradeText.replace('급', ''));
-                    if (levelNum > maxGrade) maxGrade = levelNum;
-                }
-            }
-        });
-        const gradeColors = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#64748b'];
-        const chartData = [];
-        Object.keys(gradeCounts).forEach((gradeKey, index) => {
-            if (gradeCounts[gradeKey] > 0) {
-                const gradeNum = parseInt(gradeKey.replace('급', ''));
-                chartData.push({
-                    name: gradeKey,
-                    y: gradeCounts[gradeKey],
-                    color: gradeColors[gradeNum - 1],
-                    gradeIndex: gradeNum
-                });
-            }
-        });
-        gradeChartInstance.series[0].setData(chartData);
-        window.updateOverallGrade(maxGrade);
+        // Legacy support removed to simplify - full reload preferred for this complexity
     };
 
     window.updateOverallGrade = function (maxGrade) {
@@ -212,11 +224,11 @@
         }
     };
 
-    // [New] Toggle Ungraded Series
+    // [New] Toggle Ungraded Series (Bar Chart)
     window.toggleUngradedSeries = function (checkbox) {
         if (!comparisonChartInstance) return;
 
-        // '등급 없음' 시리즈 찾기 (인덱스나 이름으로)
+        // '등급 없음' 시리즈 찾기
         const ungradedSeries = comparisonChartInstance.series.find(s => s.name === '등급 없음');
         if (ungradedSeries) {
             ungradedSeries.setVisible(checkbox.checked);
@@ -419,6 +431,261 @@
     }
 
 
+    // [New] Toggle Pie Chart Mode (Integrated vs Individual)
+    window.togglePieMode = function (mode) {
+        const integratedArea = document.getElementById('integrated-chart-area');
+        const individualArea = document.getElementById('individual-charts-container');
+        const sharedLegend = document.getElementById('shared-pie-legend');
+
+        if (mode === 'integrated') {
+            integratedArea.style.display = 'block';
+            individualArea.style.display = 'none';
+            if (sharedLegend) sharedLegend.style.display = 'none';
+        } else {
+            integratedArea.style.display = 'none';
+            individualArea.style.display = 'grid';
+            if (sharedLegend) sharedLegend.style.display = 'flex';
+
+            // Re-flow charts inside grid to ensure correct size
+            // (Highcharts sometimes needs reflow when container becomes visible)
+            Highcharts.charts.forEach(chart => {
+                if (chart && chart.options.chart.type === 'pie') {
+                    chart.reflow();
+                }
+            });
+        }
+    };
+
+    // [New] Render Shared Legend
+    function renderSharedLegend() {
+        const container = document.getElementById('shared-pie-legend');
+        if (!container) return;
+
+        container.innerHTML = '';
+        const gradeKeys = ['1급', '2급', '3급', '4급', '5급', '6급', '등급 없음'];
+        const gradeColors = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#64748b', '#94a3b8'];
+
+        gradeKeys.forEach((key, index) => {
+            const btn = document.createElement('div');
+            btn.className = 'shared-legend-item';
+            // Styling to mimic Highcharts legend
+            btn.style.cursor = 'pointer';
+            btn.style.display = 'flex';
+            btn.style.alignItems = 'center';
+            btn.style.gap = '6px';
+            btn.style.color = 'var(--color-text)';
+            btn.style.fontSize = '14px';
+            btn.style.fontWeight = 'bold';
+            btn.style.opacity = '1';
+            btn.style.transition = 'opacity 0.2s';
+            btn.dataset.seriesName = key;
+            btn.onclick = () => window.toggleSharedSeries(key, btn);
+
+            const indicator = document.createElement('span');
+            indicator.style.display = 'inline-block';
+            indicator.style.width = '12px';
+            indicator.style.height = '12px';
+            indicator.style.borderRadius = '50%';
+            indicator.style.backgroundColor = gradeColors[index];
+
+            const text = document.createElement('span');
+            text.innerText = key;
+
+            btn.appendChild(indicator);
+            btn.appendChild(text);
+            container.appendChild(btn);
+        });
+    }
+
+    // [New] Toggle Shared Series Logic
+    window.toggleSharedSeries = function (seriesName, btnElement) {
+        // Toggle visual state of button
+        const isHidden = btnElement.style.opacity === '0.5';
+        btnElement.style.opacity = isHidden ? '1' : '0.5';
+        const setVisible = isHidden; // If it was hidden, make it visible
+
+        // Iterate all charts and toggle the specific slice
+        // Note: For Pie charts in Highcharts, each slice is a 'point' in one series.
+        // We need to find the point with name == seriesName.
+
+        Highcharts.charts.forEach(chart => {
+            // Check if this is one of our mini-pies (you might want a better check if there are other charts)
+            // We can check container ID prefix
+            if (chart && chart.renderTo.id.startsWith('mini-pie-')) {
+                if (chart.series[0]) {
+                    const point = chart.series[0].points.find(p => p.name === seriesName);
+                    if (point) {
+                        point.setVisible(setVisible);
+                    }
+                }
+            }
+        });
+    }
+
+    // [New] Render Individual Pie Charts
+    function renderIndividualCharts(fileStats) {
+        const container = document.getElementById('individual-charts-container');
+        if (!container) return;
+        container.innerHTML = ''; // Clear existing
+
+        if (!fileStats || fileStats.length === 0) {
+            container.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--color-text-muted);">데이터가 없습니다.</p>';
+            return;
+        }
+
+        // Render Legend ONCE
+        renderSharedLegend();
+
+        const gradeColors = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#64748b', '#94a3b8']; // Added No Grade color
+
+        fileStats.forEach((item, index) => {
+            const chartDiv = document.createElement('div');
+            chartDiv.id = `mini-pie-${index}`;
+            chartDiv.style.width = '100%';
+            chartDiv.style.height = '300px'; // Reduced height since legend is gone
+            chartDiv.style.backgroundColor = 'var(--color-card-bg)';
+            chartDiv.style.borderRadius = '12px';
+            chartDiv.style.border = '1px solid var(--muted-border-color)';
+            chartDiv.style.padding = '10px';
+            container.appendChild(chartDiv);
+
+            // 데이터 가공
+            const chartData = [];
+            // 1~6급
+            for (let i = 1; i <= 6; i++) {
+                const key = `${i}급`;
+                const count = item.stats[key] || 0;
+                if (count > 0) {
+                    chartData.push({
+                        name: key,
+                        y: count,
+                        color: gradeColors[i - 1],
+                        gradeIndex: i
+                    });
+                }
+            }
+            // 등급 없음 (Always check)
+            const noGradeCount = item.stats['등급 없음'] || 0;
+            if (noGradeCount > 0) {
+                chartData.push({
+                    name: '등급 없음',
+                    y: noGradeCount,
+                    color: gradeColors[6], // #94a3b8
+                    gradeIndex: 99
+                });
+            }
+
+            // 차트 렌더링
+            Highcharts.chart(chartDiv.id, {
+                chart: {
+                    type: 'pie',
+                    backgroundColor: 'transparent',
+                    height: 280
+                },
+                title: {
+                    text: item.filename,
+                    style: { fontSize: '16px', fontWeight: 'bold', color: 'var(--color-text)' }
+                },
+                tooltip: { pointFormat: '{series.name}: <b>{point.y}개 ({point.percentage:.1f}%)</b>' },
+                plotOptions: {
+                    pie: {
+                        allowPointSelect: true,
+                        cursor: 'pointer',
+                        dataLabels: {
+                            enabled: true,
+                            format: '{point.name}',
+                            distance: -30, // 라벨 안쪽으로
+                            style: { fontSize: '12px', fontWeight: 'bold', color: '#fff', textOutline: 'none' }
+                        },
+                        showInLegend: false // [CHANGED] Disable per-chart legend
+                    }
+                },
+                series: [{ name: '개수', data: chartData }],
+                credits: { enabled: false }
+            });
+        });
+    }
+
+    // [New] Render Overall Chart (Refactored)
+    function renderOverallChart(labels, data) {
+        const gradeColors = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#64748b', '#94a3b8']; // Added No Grade color
+
+        if (!labels || labels.length === 0) return;
+
+        const chartData = [];
+        labels.forEach((label, index) => {
+            const count = data[index];
+            if (count > 0) {
+                // 등급 없음 처리
+                if (label === '등급 없음') {
+                    chartData.push({
+                        name: label,
+                        y: count,
+                        color: gradeColors[6], // #94a3b8
+                        gradeIndex: 99
+                    });
+                } else {
+                    const gradeNum = parseInt(label.replace(/[^0-9]/g, ''));
+                    // 1~6급만 추가 (혹시 모를 이상값 방지)
+                    if (gradeNum >= 1 && gradeNum <= 6) {
+                        chartData.push({
+                            name: label,
+                            y: count,
+                            color: gradeColors[gradeNum - 1],
+                            gradeIndex: gradeNum
+                        });
+                    }
+                }
+            }
+        });
+
+        gradeChartInstance = Highcharts.chart('gradeChart', {
+            chart: {
+                type: 'pie',
+                options3d: { enabled: true, alpha: 45, beta: 0 },
+                backgroundColor: 'transparent',
+                height: 400
+            },
+            title: { text: '' },
+            tooltip: { pointFormat: '{series.name}: <b>{point.y}개 ({point.percentage:.1f}%)</b>' },
+            plotOptions: {
+                pie: {
+                    allowPointSelect: true,
+                    cursor: 'pointer',
+                    depth: 35,
+                    dataLabels: {
+                        enabled: true,
+                        format: '{point.name}',
+                        style: { fontSize: '20px', fontWeight: 'bold', color: 'var(--color-text)' }
+                    },
+                    point: {
+                        events: {
+                            mouseOver: function () {
+                                if (this.gradeIndex === 99) return; // 등급 없음은 하이라이트 제외
+                                const targetClass = `text-grade-${this.gradeIndex}`;
+                                document.querySelectorAll(`.${targetClass}`).forEach(el => el.classList.add('highlight-active'));
+                            },
+                            mouseOut: function () {
+                                if (this.gradeIndex === 99) return;
+                                document.querySelectorAll('.interactive-word').forEach(el => el.classList.remove('highlight-active'));
+                            }
+                        }
+                    },
+                    showInLegend: true // [NEW] Legend enabled
+                }
+            },
+            legend: {
+                layout: 'horizontal',
+                align: 'center',
+                verticalAlign: 'bottom',
+                itemStyle: { color: 'var(--color-text)', fontWeight: 'bold', fontSize: '14px' },
+                itemHoverStyle: { color: 'var(--color-primary)' }
+            },
+            series: [{ name: '개수', data: chartData }],
+            credits: { enabled: false }
+        });
+    }
+
     // [New] Text File Filter Logic
     window.filterTextFile = function (targetId) {
         // Hide all
@@ -436,85 +703,37 @@
 
     document.addEventListener('DOMContentLoaded', function () {
         loadHighcharts(function () {
-            // 1. 종합 원그래프 (기존 로직)
-            let initialLabels = [];
-            let initialData = [];
-            let fileStats = [];
-
+            // 1. 종합 원그래프 데이터 로드
             try {
                 const labelsEl = document.getElementById('viz-data-labels');
                 const dataEl = document.getElementById('viz-data-data');
                 const fileStatsEl = document.getElementById('viz-file-stats');
 
-                if (labelsEl && labelsEl.textContent.trim()) initialLabels = JSON.parse(labelsEl.textContent);
-                if (dataEl && dataEl.textContent.trim()) initialData = JSON.parse(dataEl.textContent);
-                if (fileStatsEl && fileStatsEl.textContent.trim()) fileStats = JSON.parse(fileStatsEl.textContent);
+                if (labelsEl && labelsEl.textContent.trim()) globalInitialLabels = JSON.parse(labelsEl.textContent);
+                if (dataEl && dataEl.textContent.trim()) globalInitialData = JSON.parse(dataEl.textContent);
+                if (fileStatsEl && fileStatsEl.textContent.trim()) globalFileStats = JSON.parse(fileStatsEl.textContent);
 
             } catch (e) {
                 console.error("[visualization.html] Error parsing visualization data:", e);
             }
 
-            // Render Overall Chart
-            const gradeColors = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#64748b'];
-            if (initialLabels.length > 0) {
-                const chartData = initialLabels.map((label, index) => {
-                    const gradeNum = parseInt(label.replace(/[^0-9]/g, ''));
-                    return {
-                        name: label,
-                        y: initialData[index],
-                        color: gradeColors[gradeNum - 1],
-                        gradeIndex: gradeNum
-                    };
-                });
+            // Render Overall Chart (initially without ungraded - wait, user wants legend now, so always include)
+            renderOverallChart(globalInitialLabels, globalInitialData);
 
-                gradeChartInstance = Highcharts.chart('gradeChart', {
-                    chart: {
-                        type: 'pie',
-                        options3d: { enabled: true, alpha: 45, beta: 0 },
-                        backgroundColor: 'transparent',
-                        height: 400
-                    },
-                    title: { text: '' },
-                    tooltip: { pointFormat: '{series.name}: <b>{point.y}개 ({point.percentage:.1f}%)</b>' },
-                    plotOptions: {
-                        pie: {
-                            allowPointSelect: true,
-                            cursor: 'pointer',
-                            depth: 35,
-                            dataLabels: {
-                                enabled: true,
-                                format: '{point.name}',
-                                style: { fontSize: '20px', fontWeight: 'bold', color: 'var(--color-text)' }
-                            },
-                            point: {
-                                events: {
-                                    mouseOver: function () {
-                                        const targetClass = `text-grade-${this.gradeIndex}`;
-                                        document.querySelectorAll(`.${targetClass}`).forEach(el => el.classList.add('highlight-active'));
-                                    },
-                                    mouseOut: function () {
-                                        document.querySelectorAll('.interactive-word').forEach(el => el.classList.remove('highlight-active'));
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    series: [{ name: '개수', data: chartData }],
-                    credits: { enabled: false }
-                });
-            }
-
-            // 2. 파일별 비교 차트 (Ratio & Absolute)
-            if (fileStats && fileStats.length > 0) {
-                renderComparisonChart(fileStats);
-                renderAbsoluteChart(fileStats);
+            // 2. 파일별 비교 차트 (Ratio & Absolute) + [NEW] 개별 원그래프
+            if (globalFileStats && globalFileStats.length > 0) {
+                renderComparisonChart(globalFileStats);
+                renderAbsoluteChart(globalFileStats);
+                renderIndividualCharts(globalFileStats); // [NEW] 초기 렌더링 (Hidden 상태)
             } else {
                 const comparisonDiv = document.getElementById('fileComparisonChart');
                 const absoluteDiv = document.getElementById('fileAbsoluteChart');
+                const individualContainer = document.getElementById('individual-charts-container');
                 const msg = '<p style="text-align:center; color:var(--color-text-muted); padding:2rem;">비교할 파일 데이터가 없습니다.</p>';
 
                 if (comparisonDiv) comparisonDiv.innerHTML = msg;
                 if (absoluteDiv) absoluteDiv.innerHTML = msg;
+                if (individualContainer) individualContainer.innerHTML = msg;
             }
         });
     });
