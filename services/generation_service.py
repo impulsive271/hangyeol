@@ -47,9 +47,26 @@ class GenerationService:
         
         prompt += "\n[출력 제약사항]\n1. 설명 금지, 오직 예문 1개만 출력.\n2. 마크다운, 따옴표, 불필요한 기호 사용 금지.\n3. 반드시 한국어 마침표(.)로 끝낼 것."
         
-        try:
-            return self.model.generate_content(prompt).text.strip().replace("**", "").replace('"', "")
-        except Exception as e: return f"오류: {str(e)}"
+        import time
+        from google.api_core.exceptions import ResourceExhausted
+
+        max_api_retries = 3
+        base_delay = 2
+
+        for attempt in range(max_api_retries):
+            try:
+                return self.model.generate_content(prompt).text.strip().replace("**", "").replace('"', "")
+            except ResourceExhausted:
+                if attempt < max_api_retries - 1:
+                    sleep_time = base_delay * (2 ** attempt)
+                    print(f"⚠️ Quota exceeded (429). Retrying in {sleep_time}s... (Attempt {attempt + 1}/{max_api_retries})")
+                    time.sleep(sleep_time)
+                else:
+                    return "오류: 일일 사용량이 초과되었습니다. 잠시 후 다시 시도해주세요. (429 Resource Exhausted)"
+            except Exception as e:
+                return f"오류: {str(e)}"
+        
+        return "오류: 알 수 없는 이유로 생성이 실패했습니다."
 
     def generate_with_validation(self, grades, keyword, hint, analysis_service):
         import re 
