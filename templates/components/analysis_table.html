@@ -1,14 +1,17 @@
-<h4 style="margin: 0; font-weight: 700; color: #ccc;">📊 상세 분석 결과</h4>
-<div>
-    <button type="button" class="outline contrast" onclick="downloadTableAsCsv('analysis-table', 'analysis_result.csv')"
-        style="padding: 6px 16px; font-size: 0.85rem; margin-bottom: 0; margin-right: 0.5rem;">
-        💾 CSV로 다운로드
-    </button>
-    <button type="button" class="outline contrast" onclick="copyTableText('analysis-table')"
-        style="padding: 6px 16px; font-size: 0.85rem; margin-bottom: 0;">
-        📋 텍스트로 복사
-    </button>
-</div>
+<div
+    style="display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; margin-bottom: 0.8rem;">
+    <h4 style="margin: 0; font-weight: 700; color: var(--color-text);">📊 상세 분석 결과</h4>
+    <div>
+        <button type="button" class="outline contrast"
+            onclick="downloadTableAsCsv('analysis-table', 'analysis_result.csv')"
+            style="padding: 6px 16px; font-size: 0.85rem; margin-bottom: 0; margin-right: 0.5rem;">
+            💾 CSV로 다운로드
+        </button>
+        <button type="button" class="outline contrast" onclick="copyTableText('analysis-table')"
+            style="padding: 6px 16px; font-size: 0.85rem; margin-bottom: 0;">
+            📋 텍스트로 복사
+        </button>
+    </div>
 </div>
 
 <div class="table-container">
