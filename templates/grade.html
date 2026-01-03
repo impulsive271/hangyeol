@@ -2,10 +2,10 @@
 {% block content %}
 <section>
   <h2>🚀 분석</h2>
-  <p>문장을 입력하고 제출하면 등급과 상세 분석 표를 확인할 수 있습니다.</p>
+  <p>텍스트를 입력하고 제출하면 등급과 상세 분석 표를 확인할 수 있습니다.</p>
 
   <form method="post" class="form" id="grade-form">
-    <label for="sentence">문장</label>
+    <label for="sentence">텍스트</label>
     <textarea id="sentence" name="sentence" rows="3"
       placeholder="예) 사과가 맛없으면 사과할게요">{{ last_sentence or '' }}</textarea>
 
@@ -16,11 +16,11 @@
           <span class="slider-text" data-on="ON" data-off="OFF"></span>
         </span>
       </label>
-      <label for="clear-toggle" class="toggle-label">문장 판독 후 지워집니다.</label>
+      <label for="clear-toggle" class="toggle-label">분석 후 지워집니다.</label>
       <input type="hidden" id="clear-toggle-input" name="clear_on_submit" value="false">
     </div>
 
-    <button type="submit">판독하기</button>
+    <button type="submit">분석하기</button>
   </form>
 
   <details style="margin-top: 1rem; margin-bottom: 2rem;">
@@ -29,7 +29,7 @@
       <form action="{{ url_for('main.grade_upload') }}" method="post" enctype="multipart/form-data" class="grid"
         style="grid-template-columns: 3fr 1fr; gap: 10px; margin-bottom:0; padding:0; border:none; box-shadow:none; background:transparent; backdrop-filter:none; -webkit-backdrop-filter:none;">
         <input type="file" name="file" accept=".txt" multiple required>
-        <button type="submit" class="secondary">업로드 및 판독</button>
+        <button type="submit" class="secondary">업로드 및 분석</button>
       </form>
       <small style="color: var(--color-text-muted);">※ 현재 <strong>.txt</strong> 파일만 지원합니다.</small>
     </div>
@@ -40,7 +40,7 @@
   {% if file_stats_list %}
   <article class="result-card">
     <header>
-      <strong style="font-size: 1.3rem;">판독 결과</strong>
+      <strong style="font-size: 1.3rem;">분석 결과</strong>
     </header>
 
     <!-- [NEW] 등급 빈도수 테이블 -->

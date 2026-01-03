@@ -11,10 +11,10 @@ class GradeProfiler:
         if not model or not ambiguous_items: return {}, "AI 미사용"
         
         prompt = f"""
-        당신은 한국어 어휘 판독기입니다. 아래 문맥을 보고 동음이의어 중 가장 적절한 의미를 고르세요.
+        당신은 한국어 어휘 분석기입니다. 아래 문맥을 보고 동음이의어 중 가장 적절한 의미를 고르세요.
         문맥: "{sentence}"
         
-        [판독 대상 목록]
+        [분석 대상 목록]
         """
         for i, item in enumerate(ambiguous_items):
             options_str = ", ".join([f"(ID:{cand['uid']}) {cand['desc']}" for cand in item['candidates']])
@@ -230,9 +230,9 @@ class GradeProfiler:
             })
             i += 1
             
-        # AI 결과 반영 (동음이의어 판독)
+        # AI 결과 반영 (동음이의어 분석)
         if ambiguous_items and ai_model:
-            self.debug_lines.append(f"🤖 AI 동음이의어 판독 시작 ({len(ambiguous_items)}건)...")
+            self.debug_lines.append(f"🤖 AI 동음이의어 분석 시작 ({len(ambiguous_items)}건)...")
             ai_decisions, raw_log = self._disambiguate_with_ai(ai_model, sentence, ambiguous_items)
             
             for i, item in enumerate(ambiguous_items):
