@@ -56,19 +56,41 @@
         <p style="color: var(--color-text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
             * 그래프의 각 조각에 마우스를 올리면 해당 등급의 단어가 강조됩니다.
         </p>
+        <!-- [NEW] 파일 선택 드롭다운 -->
+        {% if file_text_contents and file_text_contents|length > 1 %}
+        <div style="margin-bottom: 1rem; text-align: right;">
+            <select id="text-file-select" onchange="filterTextFile(this.value)"
+                style="padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid var(--muted-border-color); background-color: var(--color-card-bg); color: var(--color-text); font-size: 1rem;">
+                {% for file_item in file_text_contents %}
+                <option value="file-content-{{ loop.index }}">{{ file_item.filename }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
         <div id="highlighted-text-box"
-            style="padding: 1.5rem; border-radius: 12px; line-height: 2.0; font-size: 1.2rem; border: 1px solid var(--muted-border-color);">
-            {% for seg in text_segments %}
-            {% if seg.type == 'graded' %}
-            <span class="interactive-word {{ seg.class }}" data-grade="{{ seg.class }}"
-                data-offset="{{ seg.info.offset_start }}" data-ui-id="{{ seg.info._ui_id }}"
-                data-tooltip="{{ seg.info.level }} - {{ seg.info.desc }}">
-                {{ seg.text }}
-            </span>
-            {% else %}
-            <span>{{ seg.text }}</span>
-            {% endif %}
+            style="padding: 1.5rem; border-radius: 12px; line-height: 2.0; font-size: 1.2rem; border: 1px solid var(--muted-border-color); max-height: 500px; overflow-y: auto;">
+
+            {% if file_text_contents %}
+            {% for file_item in file_text_contents %}
+            <div id="file-content-{{ loop.index }}" class="file-text-content"
+                style="display: {{ 'block' if loop.first else 'none' }}">
+                {% for seg in file_item.segments %}
+                {% if seg.type == 'graded' %}
+                <span class="interactive-word {{ seg.class }}" data-grade="{{ seg.class }}"
+                    data-offset="{{ seg.info.offset_start }}" data-ui-id="{{ seg.info._ui_id }}"
+                    data-tooltip="{{ seg.info.level }} - {{ seg.info.desc }}">
+                    {{ seg.text }}
+                </span>
+                {% else %}
+                <span>{{ seg.text }}</span>
+                {% endif %}
+                {% endfor %}
+            </div>
             {% endfor %}
+            {% else %}
+            <p style="color: var(--color-text-muted);">시각화할 텍스트 데이터가 없습니다.</p>
+            {% endif %}
         </div>
     </div>
 
@@ -396,6 +418,21 @@
         });
     }
 
+
+    // [New] Text File Filter Logic
+    window.filterTextFile = function (targetId) {
+        // Hide all
+        const contents = document.getElementsByClassName('file-text-content');
+        for (let i = 0; i < contents.length; i++) {
+            contents[i].style.display = 'none';
+        }
+
+        // Show target
+        const target = document.getElementById(targetId);
+        if (target) {
+            target.style.display = 'block';
+        }
+    };
 
     document.addEventListener('DOMContentLoaded', function () {
         loadHighcharts(function () {

@@ -33,6 +33,7 @@ def grade():
             item['filename'] = '직접 입력'
             
         visualization_data, text_segments = analysis_service.get_visualization_data(analysis_result, last_sentence)
+        file_text_contents = [{'filename': '직접 입력', 'segments': text_segments}]
 
     return render_template("grade.html", 
                            file_stats_list=file_stats_list, 
@@ -40,7 +41,7 @@ def grade():
                            last_sentence=last_sentence,
                            debug_log=debug_log,
                            visualization_data=visualization_data,
-                           text_segments=text_segments)
+                           file_text_contents=file_text_contents)
 
 @main_bp.route("/grade/upload", methods=["POST"])
 def grade_upload():
@@ -55,6 +56,10 @@ def grade_upload():
     full_debug_log = ""
 
     try:
+        # [NEW] 파일별 텍스트 세그먼트 및 종합 데이터 집계
+        file_text_contents = []
+        overall_grade_counts = {f"{i}급": 0 for i in range(1, 7)}
+
         for file in files:
             if not file: continue
             filename = file.filename
@@ -76,10 +81,26 @@ def grade_upload():
             combined_text.append(f"[{filename}]\n{extracted_text}")
             full_debug_log += f"--- {filename} ---\n{debug_log}\n"
 
+            # [NEW] 개별 파일 시각화 데이터 생성 (텍스트 세그먼트용)
+            # Pie Chart용 카운트 누적
+            _, temp_segments = analysis_service.get_visualization_data(analysis_result, extracted_text)
+            file_text_contents.append({
+                'filename': filename,
+                'segments': temp_segments
+            })
+            
+            # 종합 원그래프용 데이터 누적
+            for k, v in grade_stats.items():
+                if k in overall_grade_counts:
+                    overall_grade_counts[k] += v
+
         full_extracted_text = "\n\n".join(combined_text)
         
-        # 시각화 데이터 (전체 합산 기준)
-        visualization_data, text_segments = analysis_service.get_visualization_data(combined_analysis_result, full_extracted_text)
+        # 종합 Pie Chart 데이터 재구성
+        visualization_data = {
+            "labels": [k for k, v in overall_grade_counts.items() if v > 0],
+            "data": [v for v in overall_grade_counts.values() if v > 0]
+        }
         
         # grade.html 렌더링
         return render_template("grade.html", 
@@ -88,7 +109,7 @@ def grade_upload():
                        last_sentence=full_extracted_text,
                        debug_log=full_debug_log,
                        visualization_data=visualization_data,
-                       text_segments=text_segments)
+                       file_text_contents=file_text_contents)  # [NEW] 전달
 
     except Exception as e:
         return f"파일 처리 중 오류 발생: {e}", 500
