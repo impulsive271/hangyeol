@@ -44,8 +44,24 @@
     </header>
 
     <!-- [NEW] 등급 빈도수 테이블 -->
-    <div style="margin: 1.5rem 0; overflow-x: auto; text-align: center;">
-      <table role="grid" style="text-align: center; width: 100%; border-collapse: collapse;">
+    <div
+      style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; margin-bottom: 0.5rem;">
+      <h4 style="margin: 0; font-weight: 700;">📊 파일별 등급 빈도표</h4>
+      <div>
+        <button type="button" class="outline contrast"
+          onclick="downloadTableAsCsv('frequency-table', 'frequency_stats.csv')"
+          style="padding: 6px 16px; font-size: 0.85rem; margin-bottom: 0; margin-right: 0.5rem;">
+          💾 CSV로 다운로드
+        </button>
+        <button type="button" class="outline contrast" onclick="copyTableText('frequency-table')"
+          style="padding: 6px 16px; font-size: 0.85rem; margin-bottom: 0;">
+          📋 텍스트로 복사
+        </button>
+      </div>
+    </div>
+
+    <div style="margin-bottom: 1.5rem; overflow-x: auto; text-align: center;">
+      <table id="frequency-table" role="grid" style="text-align: center; width: 100%; border-collapse: collapse;">
         <thead>
           <tr style="border-bottom: 1px solid var(--muted-border-color);">
             <th style="padding: 10px; min-width: 120px;">파일명</th>
@@ -122,14 +138,14 @@
 
 <script>
   // [UI] 표 내용을 탭(Tab) 구분 텍스트로 복사하는 함수
-  function copyTableText() {
-    const table = document.getElementById('analysis-table');
+  function copyTableText(tableId) {
+    const table = document.getElementById(tableId);
     if (!table) return;
 
     let textToCopy = "";
 
     // 헤더 가져오기
-    const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText);
+    const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText.trim());
     textToCopy += headers.join('\t') + '\n';
 
     // 본문 행 가져오기
@@ -148,28 +164,30 @@
     });
   }
 
-  function downloadTableAsCsv() {
-    const table = document.getElementById('analysis-table');
+  function downloadTableAsCsv(tableId, filename) {
+    const table = document.getElementById(tableId);
     if (!table) return;
 
     let csvContent = "\uFEFF"; // BOM for Excel
 
-    // 헤더 (마지막 '수정' 컬럼 제외)
-    // analysis_table.html 구조상 th가 6개(마지막은 수정). 
-    // 하지만 copyTableText는 th.innerText를 그냥 다 가져오는 듯?
-    // th 구조 확인: 표제어, 품사, 등급, 번호, 길잡이말, 수정
-    // CSV에는 '수정' 컬럼이 필요 없으므로 제외하는 게 좋음.
-
+    // 헤더
     const headers = Array.from(table.querySelectorAll('thead th'))
-      .slice(0, -1) // 마지막 컬럼 제외
-      .map(th => th.innerText);
+      //.slice(0, -1) // Removed hardcoded slice - filtering logic should be handled by caller or generic
+      .filter(th => th.innerText !== '수정') // Simple filtering: prevent '수정' col
+      .map(th => th.innerText.trim());
     csvContent += headers.join(',') + '\n';
 
     // 본문
     const rows = table.querySelectorAll('tbody tr');
     rows.forEach(row => {
       const cells = Array.from(row.querySelectorAll('td'))
-        .slice(0, -1) // 마지막 컬럼 제외
+        //.slice(0, -1) // Removed hardcoded slice
+        .filter((td, index) => {
+          // Filter out '수정' column if it exists in header. 
+          // We can check if corresponding header is '수정' but let's just exclude last one if it is button
+          const btn = td.querySelector('.btn-edit-row');
+          return !btn;
+        })
         .map(td => {
           let text = td.innerText.replace(/[\r\n]+/g, " ").trim();
           // 쉼표가 있으면 따옴표로 감싸기
@@ -183,7 +201,7 @@
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', 'analysis_result.csv');
+    link.setAttribute('download', filename || 'table_data.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
