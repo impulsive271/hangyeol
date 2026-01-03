@@ -59,6 +59,7 @@ def grade_upload():
         # [NEW] 파일별 텍스트 세그먼트 및 종합 데이터 집계
         file_text_contents = []
         overall_grade_counts = {f"{i}급": 0 for i in range(1, 7)}
+        overall_grade_counts["등급 없음"] = 0 # [NEW] 등급 없음 추가
 
         for file in files:
             if not file: continue
