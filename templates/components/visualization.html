@@ -7,6 +7,7 @@
     <div class="nav-tabs">
         <button class="nav-tab active" onclick="openVizTab(event, 'tab-overall')">종합 분포</button>
         <button class="nav-tab" onclick="openVizTab(event, 'tab-comparison')">비율막대그림</button>
+        <button class="nav-tab" onclick="openVizTab(event, 'tab-absolute')">빈도막대그림</button>
     </div>
 
     <!-- 2. 탭 콘텐츠 영역 -->
@@ -20,15 +21,15 @@
             </div>
         </div>
 
-        <!-- Tab 2: 파일별 비교 (누적 막대 그래프) -->
+        <!-- Tab 2: 파일별 비교 (누적 비율) -->
         <div id="tab-comparison" class="viz-tab-pane" style="display: none;">
-            <h3 style="margin-bottom: 1rem; font-weight: 700;">📊 파일별 텍스트 어휘 등급 분포 비교</h3>
+            <h3 style="margin-bottom: 1rem; font-weight: 700;">📊 파일별 텍스트 어휘 등급 분포 비교 (비율)</h3>
             <p style="color: var(--color-text-muted); font-size: 0.9rem; margin-bottom: 1rem; text-align: center;">
                 * 각 텍스트 파일 내 어휘 등급 비율을 한눈에 비교할 수 있습니다.
             </p>
             <div id="fileComparisonChart" style="width: 100%; height: 500px;"></div>
 
-            <!-- [NEW] 등급 없음 포함 체크박스 -->
+            <!-- 등급 없음 포함 체크박스 -->
             <div style="text-align: right; margin-top: 10px;">
                 <label
                     style="cursor: pointer; font-size: 0.95rem; user-select: none; display: inline-flex; align-items: center; gap: 8px;">
@@ -36,6 +37,15 @@
                     <span>'등급 없음' 포함하여 보기</span>
                 </label>
             </div>
+        </div>
+
+        <!-- Tab 3: 파일별 비교 (절대 빈도) -->
+        <div id="tab-absolute" class="viz-tab-pane" style="display: none;">
+            <h3 style="margin-bottom: 1rem; font-weight: 700;">📈 파일별 어휘 빈도수 비교 (절대빈도)</h3>
+            <p style="color: var(--color-text-muted); font-size: 0.9rem; margin-bottom: 1rem; text-align: center;">
+                * 각 텍스트 파일의 전체 단어 수와 등급별 단어 수를 비교할 수 있습니다.
+            </p>
+            <div id="fileAbsoluteChart" style="width: 100%; height: 500px;"></div>
         </div>
 
     </div>
@@ -98,7 +108,8 @@
     }
 
     let gradeChartInstance = null; // Donut Chart instance
-    let comparisonChartInstance = null; // Bar Chart instance
+    let comparisonChartInstance = null; // Ratio Bar Chart instance
+    let absoluteChartInstance = null; // Absolute Bar Chart instance
 
     // 탭 전환 함수
     window.openVizTab = function (evt, tabId) {
@@ -123,6 +134,8 @@
             comparisonChartInstance.reflow();
         } else if (tabId === 'tab-overall' && gradeChartInstance) {
             gradeChartInstance.reflow();
+        } else if (tabId === 'tab-absolute' && absoluteChartInstance) {
+            absoluteChartInstance.reflow();
         }
     };
 
@@ -182,20 +195,18 @@
         if (!comparisonChartInstance) return;
 
         // '등급 없음' 시리즈 찾기 (인덱스나 이름으로)
-        // 이름 '등급 없음' 시리즈를 찾아서 보여주거나 숨김
         const ungradedSeries = comparisonChartInstance.series.find(s => s.name === '등급 없음');
         if (ungradedSeries) {
             ungradedSeries.setVisible(checkbox.checked);
         }
     };
 
-    // [New] Render Comparison Chart
+    // [New] Render Comparison Chart (Ratio)
     function renderComparisonChart(fileStats) {
         if (!fileStats || fileStats.length === 0) return;
 
         // X축 카테고리 (파일명)
         const categories = fileStats.map(item => {
-            // 파일명이 너무 길면 ... 처리
             const name = item.filename;
             return name.length > 15 ? name.substring(0, 15) + '...' : name;
         });
@@ -217,9 +228,7 @@
             chart: {
                 type: 'bar', // 가로 막대 그래프
                 backgroundColor: 'transparent',
-                style: {
-                    fontFamily: 'var(--font-family)'
-                }
+                style: { fontFamily: 'var(--font-family)' }
             },
             title: { text: '' },
             xAxis: {
@@ -247,22 +256,20 @@
                     overflow: 'justify',
                     style: { color: 'var(--color-text-muted)' }
                 },
-                reversedStacks: false // [핵심] 1급이 왼쪽(축 시작점)에 오도록 설정
+                reversedStacks: false // 1급이 왼쪽(축 시작점)에 오도록 설정
             },
             tooltip: {
                 pointFormat: '<span style="color:{series.color}">{series.name}</span>: <b>{point.y}</b> ({point.percentage:.1f}%)<br/>',
                 shared: true,
-                backgroundColor: 'var(--color-card-bg)', // 툴팁 배경도 테마 적용
+                backgroundColor: 'var(--color-card-bg)',
                 borderColor: 'var(--color-card-border)',
-                style: {
-                    color: 'var(--color-text)'
-                }
+                style: { color: 'var(--color-text)' }
             },
             plotOptions: {
                 bar: {
                     stacking: 'percent', // 100% 누적 막대
-                    groupPadding: 0.02,   // [수정] 막대 사이 간격 최소화
-                    pointPadding: 0.02,   // [수정] 포인트 간 간격 최소화
+                    groupPadding: 0.02,   // 막대 사이 간격 최소화
+                    pointPadding: 0.02,   // 포인트 간 간격 최소화
                     borderWidth: 0,
                     dataLabels: {
                         enabled: true,
@@ -274,25 +281,115 @@
                         },
                         style: {
                             textOutline: 'none',
-                            color: '#fff', // 바 내부 글씨는 항상 흰색이 잘 보임 (배경색이 진하므로)
+                            color: '#fff',
                             fontWeight: 'bold',
-                            textShadow: '0px 0px 3px black' // 가독성 확보
+                            textShadow: '0px 0px 3px black'
                         }
                     }
                 },
-                series: {
-                    borderRadius: 0
-                }
+                series: { borderRadius: 0 }
             },
             legend: {
                 reversed: false, // 1급부터 순서대로 표시
-                itemStyle: {
-                    color: 'var(--color-text)', // 범례 글씨 색상
-                    fontWeight: 'bold'
+                itemStyle: { color: 'var(--color-text)', fontWeight: 'bold' },
+                itemHoverStyle: { color: 'var(--color-primary)' }
+            },
+            credits: { enabled: false },
+            series: seriesData
+        });
+    }
+
+    // [New] Render Absolute Bar Chart (Frequency)
+    function renderAbsoluteChart(fileStats) {
+        if (!fileStats || fileStats.length === 0) return;
+
+        // X축 카테고리 (파일명)
+        const categories = fileStats.map(item => {
+            const name = item.filename;
+            return name.length > 15 ? name.substring(0, 15) + '...' : name;
+        });
+
+        // 1급 ~ 6급 + 등급 없음 시리즈 데이터 구성 (등급 없음 포함)
+        const gradeKeys = ['1급', '2급', '3급', '4급', '5급', '6급', '등급 없음'];
+        const gradeColors = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#64748b', '#94a3b8'];
+
+        const seriesData = gradeKeys.map((key, index) => {
+            return {
+                name: key,
+                color: gradeColors[index],
+                data: fileStats.map(item => item.stats[key] || 0) // 각 파일별 해당 급수 빈도
+            };
+        });
+
+        absoluteChartInstance = Highcharts.chart('fileAbsoluteChart', {
+            chart: {
+                type: 'bar', // 가로 막대 그래프
+                backgroundColor: 'transparent',
+                style: { fontFamily: 'var(--font-family)' }
+            },
+            title: { text: '' },
+            xAxis: {
+                categories: categories,
+                title: { text: null },
+                labels: {
+                    style: {
+                        color: 'var(--color-text)', // 다크모드 대응
+                        fontSize: '14px',
+                        fontWeight: '500'
+                    }
                 },
-                itemHoverStyle: {
-                    color: 'var(--color-primary)'
-                }
+                lineWidth: 0,
+                tickWidth: 0
+            },
+            yAxis: {
+                min: 0,
+                // 절대빈도이므로 max 100 아님
+                title: {
+                    text: '단어 수 (개)',
+                    align: 'high',
+                    style: { color: 'var(--color-text-muted)' }
+                },
+                labels: {
+                    overflow: 'justify',
+                    style: { color: 'var(--color-text-muted)' }
+                },
+                reversedStacks: false
+            },
+            tooltip: {
+                pointFormat: '<span style="color:{series.color}">{series.name}</span>: <b>{point.y}개</b><br/>',
+                shared: true,
+                backgroundColor: 'var(--color-card-bg)',
+                borderColor: 'var(--color-card-border)',
+                style: { color: 'var(--color-text)' }
+            },
+            plotOptions: {
+                bar: {
+                    stacking: 'normal', // [중요] 절대값 누적
+                    groupPadding: 0.02,
+                    pointPadding: 0.02,
+                    borderWidth: 0,
+                    dataLabels: {
+                        enabled: true,
+                        format: '{point.y}', // 개수 표시
+                        filter: {
+                            property: 'y',
+                            operator: '>',
+                            value: 0 // 0보다 클 때만 표시
+                        },
+                        style: {
+                            textOutline: 'none',
+                            color: '#fff',
+                            fontWeight: 'bold',
+                            textShadow: '0px 0px 3px black'
+                        }
+                    }
+                },
+                series: { borderRadius: 0 }
+            },
+            legend: {
+                reversed: false,
+                itemStyle: { color: 'var(--color-text)', fontWeight: 'bold' },
+                itemHoverStyle: { color: 'var(--color-primary)' }
             },
             credits: { enabled: false },
             series: seriesData
@@ -370,12 +467,17 @@
                 });
             }
 
-            // 2. 파일별 비교 차트 (New)
+            // 2. 파일별 비교 차트 (Ratio & Absolute)
             if (fileStats && fileStats.length > 0) {
                 renderComparisonChart(fileStats);
+                renderAbsoluteChart(fileStats);
             } else {
                 const comparisonDiv = document.getElementById('fileComparisonChart');
-                if (comparisonDiv) comparisonDiv.innerHTML = '<p style="text-align:center; color:var(--color-text-muted); padding:2rem;">비교할 파일 데이터가 없습니다.</p>';
+                const absoluteDiv = document.getElementById('fileAbsoluteChart');
+                const msg = '<p style="text-align:center; color:var(--color-text-muted); padding:2rem;">비교할 파일 데이터가 없습니다.</p>';
+
+                if (comparisonDiv) comparisonDiv.innerHTML = msg;
+                if (absoluteDiv) absoluteDiv.innerHTML = msg;
             }
         });
     });
