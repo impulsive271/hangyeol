@@ -1,15 +1,14 @@
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
-    <h4 style="margin: 0; font-weight: 700; color: #ccc;">📊 상세 분석 결과</h4>
-    <div>
-        <button type="button" class="outline contrast" onclick="downloadTableAsCsv()"
-            style="padding: 6px 16px; font-size: 0.85rem; margin-bottom: 0; margin-right: 0.5rem;">
-            💾 CSV로 다운로드
-        </button>
-        <button type="button" class="outline contrast" onclick="copyTableText()"
-            style="padding: 6px 16px; font-size: 0.85rem; margin-bottom: 0;">
-            📋 텍스트로 복사
-        </button>
-    </div>
+<h4 style="margin: 0; font-weight: 700; color: #ccc;">📊 상세 분석 결과</h4>
+<div>
+    <button type="button" class="outline contrast" onclick="downloadTableAsCsv('analysis-table', 'analysis_result.csv')"
+        style="padding: 6px 16px; font-size: 0.85rem; margin-bottom: 0; margin-right: 0.5rem;">
+        💾 CSV로 다운로드
+    </button>
+    <button type="button" class="outline contrast" onclick="copyTableText('analysis-table')"
+        style="padding: 6px 16px; font-size: 0.85rem; margin-bottom: 0;">
+        📋 텍스트로 복사
+    </button>
+</div>
 </div>
 
 <div class="table-container">
@@ -197,31 +196,6 @@
 <script>
     let currentEditingRow = null;
     let localDebounceTimer; // [NEW] 디바운싱 타이머
-
-    function copyTableText() {
-        const table = document.getElementById('analysis-table');
-        if (!table) return;
-        let textToCopy = "";
-
-        // 헤더
-        const headers = Array.from(table.querySelectorAll('thead th'))
-            .slice(0, -1)
-            .map(th => th.innerText);
-        textToCopy += headers.join('\t') + '\n';
-
-        // 본문
-        const rows = table.querySelectorAll('tbody tr');
-        rows.forEach(row => {
-            const cells = Array.from(row.querySelectorAll('td'))
-                .slice(0, -1)
-                .map(td => td.innerText.replace(/[\r\n]+/g, " ").trim());
-            textToCopy += cells.join('\t') + '\n';
-        });
-
-        navigator.clipboard.writeText(textToCopy).then(() => {
-            alert('텍스트가 복사되었습니다! 엑셀에 붙여넣기 좋습니다.');
-        });
-    }
 
     function openEditModal(btn) {
         currentEditingRow = btn.closest('tr');
