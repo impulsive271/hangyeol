@@ -27,7 +27,7 @@ class AnalysisService:
                 print(f"⚠️ AnalysisService AI Init Failed: {e}")
 
     def get_sentence_grade(self, sentence: str):
-        if not self.data.is_ready: return "판독 불가", [], "데이터 로드 실패"
+        if not self.data.is_ready: return "분석 불가", [], "데이터 로드 실패"
         if self.morph.use_mock or not self.morph.analyzer: return "분석 불가", [], "Kiwi 로드 실패"
         
         try:
