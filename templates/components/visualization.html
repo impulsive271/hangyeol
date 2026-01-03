@@ -1,18 +1,47 @@
-<!-- [NEW] 시각화 섹션 (원그래프 + 하이라이트 원문) -->
+<!-- [NEW] 시각화 섹션 (원그래프 + 하이라이트 원문 + 파일별 비교) -->
 <hr style="margin: 3rem 0; border-color: var(--muted-border-color);">
 
 <div class="visualization-container" style="display: flex; flex-direction: column; gap: 2rem;">
 
-    <!-- 1. 원그래프 영역 -->
-    <div>
-        <h3 style="margin-bottom: 1rem; font-weight: 700;">🍰 등급 분포</h3>
-        <div style="max-width: 500px; margin: 0 auto;">
-            <div id="gradeChart"></div>
-        </div>
+    <!-- 1. 탭 네비게이션 -->
+    <div class="nav-tabs">
+        <button class="nav-tab active" onclick="openVizTab(event, 'tab-overall')">종합 분포</button>
+        <button class="nav-tab" onclick="openVizTab(event, 'tab-comparison')">비율막대그림</button>
     </div>
 
-    <!-- 2. 하이라이트 원문 영역 -->
-    <div>
+    <!-- 2. 탭 콘텐츠 영역 -->
+    <div class="tab-content-container">
+
+        <!-- Tab 1: 종합 분포 (기존 원그래프) -->
+        <div id="tab-overall" class="viz-tab-pane active" style="display: block;">
+            <h3 style="margin-bottom: 1rem; font-weight: 700;">🍰 종합 등급 분포</h3>
+            <div style="max-width: 500px; margin: 0 auto;">
+                <div id="gradeChart"></div>
+            </div>
+        </div>
+
+        <!-- Tab 2: 파일별 비교 (누적 막대 그래프) -->
+        <div id="tab-comparison" class="viz-tab-pane" style="display: none;">
+            <h3 style="margin-bottom: 1rem; font-weight: 700;">📊 파일별 텍스트 어휘 등급 분포 비교</h3>
+            <p style="color: var(--color-text-muted); font-size: 0.9rem; margin-bottom: 1rem; text-align: center;">
+                * 각 텍스트 파일 내 어휘 등급 비율을 한눈에 비교할 수 있습니다.
+            </p>
+            <div id="fileComparisonChart" style="width: 100%; height: 500px;"></div>
+
+            <!-- [NEW] 등급 없음 포함 체크박스 -->
+            <div style="text-align: right; margin-top: 10px;">
+                <label
+                    style="cursor: pointer; font-size: 0.95rem; user-select: none; display: inline-flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="include-ungraded-toggle" onchange="toggleUngradedSeries(this)">
+                    <span>'등급 없음' 포함하여 보기</span>
+                </label>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 3. 하이라이트 원문 영역 (공통) -->
+    <div style="margin-top: 1rem;">
         <h3 style="margin-bottom: 1rem; font-weight: 700;">📝 시각화된 원문</h3>
         <p style="color: var(--color-text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
             * 그래프의 각 조각에 마우스를 올리면 해당 등급의 단어가 강조됩니다.
@@ -42,6 +71,9 @@
 <script id="viz-data-data" type="application/json">
     {{ visualization_data.data | tojson | default('[]') }}
 </script>
+<script id="viz-file-stats" type="application/json">
+    {{ file_stats_list | tojson | default('[]') }}
+</script>
 
 <!-- Highcharts 로드 확인 및 스크립트 실행 -->
 <script>
@@ -59,47 +91,66 @@
         scriptMain.onload = function () {
             const script3d = document.createElement('script');
             script3d.src = 'https://code.highcharts.com/highcharts-3d.js';
-            script3d.onload = callback;
+            script3d.onload = callback; // 3D 모듈 로드 후 콜백 실행
             document.head.appendChild(script3d);
         };
         document.head.appendChild(scriptMain);
     }
 
-    let gradeChartInstance = null; // Chart instance storage
+    let gradeChartInstance = null; // Donut Chart instance
+    let comparisonChartInstance = null; // Bar Chart instance
 
-    // Global function to refresh chart from table data
-    window.refreshGradeChart = function () {
-        console.log("[refreshGradeChart] Called.");
-        if (!gradeChartInstance) {
-            console.warn("[refreshGradeChart] Chart instance not ready.");
-            return;
+    // 탭 전환 함수
+    window.openVizTab = function (evt, tabId) {
+        // 1. 모든 탭 콘텐츠 숨김
+        const tabContents = document.getElementsByClassName("viz-tab-pane");
+        for (let i = 0; i < tabContents.length; i++) {
+            tabContents[i].style.display = "none";
         }
 
-        // 1. Recalculate counts from the table
+        // 2. 모든 탭 버튼 active 클래스 제거
+        const tabLinks = document.getElementsByClassName("nav-tab");
+        for (let i = 0; i < tabLinks.length; i++) {
+            tabLinks[i].className = tabLinks[i].className.replace(" active", "");
+        }
+
+        // 3. 선택된 탭 보이기 및 active 클래스 추가
+        document.getElementById(tabId).style.display = "block";
+        evt.currentTarget.className += " active";
+
+        // 4. 차트 리사이즈 (숨겨져 있던 차트는 사이즈가 깨질 수 있음)
+        if (tabId === 'tab-comparison' && comparisonChartInstance) {
+            comparisonChartInstance.reflow();
+        } else if (tabId === 'tab-overall' && gradeChartInstance) {
+            gradeChartInstance.reflow();
+        }
+    };
+
+    // Global function to refresh chart from table data (Legacy support for Donut)
+    window.refreshGradeChart = function () {
+        console.log("[refreshGradeChart] Called.");
+        // (기존 로직 유지 - 분석 테이블에서 데이터 읽어서 원그래프 업데이트)
+        // ... (필요 시 유지, 복잡성을 줄이기 위해 일단 기존 로직 활용)
+        if (!gradeChartInstance) return;
+
+        // ... 기존 refreshGradeChart 로직 복사 ...
         const gradeCounts = { '1급': 0, '2급': 0, '3급': 0, '4급': 0, '5급': 0, '6급': 0 };
         const rows = document.querySelectorAll('#analysis-table tbody tr');
-
-        let maxGrade = 0; // Track max grade for overall update
-
+        let maxGrade = 0;
         if (rows.length === 0) return;
-
         rows.forEach(row => {
             const gradeBadge = row.querySelector('.grade-badge');
             if (gradeBadge) {
-                const gradeText = gradeBadge.innerText.trim(); // e.g., "1급"
+                const gradeText = gradeBadge.innerText.trim();
                 if (gradeCounts[gradeText] !== undefined) {
                     gradeCounts[gradeText]++;
-
                     const levelNum = parseInt(gradeText.replace('급', ''));
                     if (levelNum > maxGrade) maxGrade = levelNum;
                 }
             }
         });
-
-        // 2. Format data for Highcharts
         const gradeColors = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#64748b'];
         const chartData = [];
-
         Object.keys(gradeCounts).forEach((gradeKey, index) => {
             if (gradeCounts[gradeKey] > 0) {
                 const gradeNum = parseInt(gradeKey.replace('급', ''));
@@ -111,170 +162,265 @@
                 });
             }
         });
-
-        // 3. Update Chart
         gradeChartInstance.series[0].setData(chartData);
-
-        // 4. Update Overall Grade Badge
         window.updateOverallGrade(maxGrade);
     };
 
-    // [NEW] Global function to update overall grade badge
     window.updateOverallGrade = function (maxGrade) {
         const gradeText = maxGrade > 0 ? `${maxGrade}급` : '분석불가';
-
-        // Target in grade.html
         const overallText = document.getElementById('overall-grade-text');
         if (overallText) overallText.innerText = gradeText;
-
-        // Target in generate.html
         const overallBadge = document.getElementById('overall-grade-badge');
         if (overallBadge) {
-            overallBadge.className = `grade-badge grade-${maxGrade}`; // Update color class
+            overallBadge.className = `grade-badge grade-${maxGrade}`;
             overallBadge.innerText = `최종: ${gradeText}`;
         }
     };
 
-    // [NEW] Global function to update visualized text
-    window.updateVisualizedText = function (offset, newGrade, newDesc, newForm, originalForm, uiId) {
-        console.log(`[updateVisualizedText] Called with: offset=${offset}, newGrade=${newGrade}, uiId=${uiId}, newForm=${newForm}`);
-        let span = null;
+    // [New] Toggle Ungraded Series
+    window.toggleUngradedSeries = function (checkbox) {
+        if (!comparisonChartInstance) return;
 
-        // 0. [Priority] Try finding by Unique UI ID
-        if (uiId) {
-            span = document.querySelector(`.interactive-word[data-ui-id="${uiId}"]`);
+        // '등급 없음' 시리즈 찾기 (인덱스나 이름으로)
+        // 이름 '등급 없음' 시리즈를 찾아서 보여주거나 숨김
+        const ungradedSeries = comparisonChartInstance.series.find(s => s.name === '등급 없음');
+        if (ungradedSeries) {
+            ungradedSeries.setVisible(checkbox.checked);
         }
-
-        // 1. Try finding by offset (Fallback 1)
-        if (!span) {
-            span = document.querySelector(`.interactive-word[data-offset="${offset}"]`);
-        }
-
-        // 2. Fallback 2: Try finding by Exact text content
-        if (!span && originalForm) {
-            const spans = document.querySelectorAll('.interactive-word');
-            for (let s of spans) {
-                if (s.innerText.trim() === originalForm.trim()) {
-                    span = s;
-                    break;
-                }
-            }
-        }
-
-        if (!span) {
-            const msg = `[오류] 시각화된 텍스트에서 해당 단어를 찾을 수 없습니다.\nUI ID: ${uiId}\nOffset: ${offset}\nOriginal: ${originalForm}`;
-            console.error(msg);
-            // alert(msg); // 사용자 요청 시 주석 해제하여 디버깅 가능하도록
-            return;
-        }
-
-        // --- Apply Updates ---
-        const gradeNum = newGrade.replace(/[^0-9]/g, '');
-        const newClass = `text-grade-${gradeNum}`;
-
-        // 1. Update Class (Color) - Remove old classes first
-        span.classList.remove('text-grade-1', 'text-grade-2', 'text-grade-3', 'text-grade-4', 'text-grade-5', 'text-grade-6');
-        span.classList.add(newClass);
-        span.dataset.grade = newClass;
-
-        // 2. Update Tooltip
-        span.dataset.tooltip = `${newGrade} - ${newDesc}`;
-
-        // 3. Update Text Content
-        if (newForm && newForm.trim() !== "") {
-            span.innerText = newForm;
-        }
-
-        // 4. Visual Feedback
-        span.style.transition = "background-color 0.5s ease";
-        span.style.backgroundColor = "#fffbeb"; // Light yellow highlight
-        setTimeout(() => {
-            span.style.backgroundColor = "transparent";
-        }, 500);
-
-        console.log("[updateVisualizedText] Success.");
     };
+
+    // [New] Render Comparison Chart
+    function renderComparisonChart(fileStats) {
+        if (!fileStats || fileStats.length === 0) return;
+
+        // X축 카테고리 (파일명)
+        const categories = fileStats.map(item => {
+            // 파일명이 너무 길면 ... 처리
+            const name = item.filename;
+            return name.length > 15 ? name.substring(0, 15) + '...' : name;
+        });
+
+        // 1급 ~ 6급 + 등급 없음 시리즈 데이터 구성
+        const gradeKeys = ['1급', '2급', '3급', '4급', '5급', '6급', '등급 없음'];
+        const gradeColors = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#64748b', '#94a3b8'];
+
+        const seriesData = gradeKeys.map((key, index) => {
+            return {
+                name: key,
+                color: gradeColors[index],
+                data: fileStats.map(item => item.stats[key] || 0), // 각 파일별 해당 급수 빈도
+                visible: key !== '등급 없음' // '등급 없음'은 기본적으로 숨김 (체크박스로 제어)
+            };
+        });
+
+        comparisonChartInstance = Highcharts.chart('fileComparisonChart', {
+            chart: {
+                type: 'bar', // 가로 막대 그래프
+                backgroundColor: 'transparent',
+                style: {
+                    fontFamily: 'var(--font-family)'
+                }
+            },
+            title: { text: '' },
+            xAxis: {
+                categories: categories,
+                title: { text: null },
+                labels: {
+                    style: {
+                        color: 'var(--color-text)', // 다크모드 대응
+                        fontSize: '14px',
+                        fontWeight: '500'
+                    }
+                },
+                lineWidth: 0,
+                tickWidth: 0
+            },
+            yAxis: {
+                min: 0,
+                max: 100, // 100% 꽉 차게
+                title: {
+                    text: '비율 (%)',
+                    align: 'high',
+                    style: { color: 'var(--color-text-muted)' }
+                },
+                labels: {
+                    overflow: 'justify',
+                    style: { color: 'var(--color-text-muted)' }
+                },
+                reversedStacks: false // [핵심] 1급이 왼쪽(축 시작점)에 오도록 설정
+            },
+            tooltip: {
+                pointFormat: '<span style="color:{series.color}">{series.name}</span>: <b>{point.y}</b> ({point.percentage:.1f}%)<br/>',
+                shared: true,
+                backgroundColor: 'var(--color-card-bg)', // 툴팁 배경도 테마 적용
+                borderColor: 'var(--color-card-border)',
+                style: {
+                    color: 'var(--color-text)'
+                }
+            },
+            plotOptions: {
+                bar: {
+                    stacking: 'percent', // 100% 누적 막대
+                    groupPadding: 0.02,   // [수정] 막대 사이 간격 최소화
+                    pointPadding: 0.02,   // [수정] 포인트 간 간격 최소화
+                    borderWidth: 0,
+                    dataLabels: {
+                        enabled: true,
+                        format: '{point.percentage:.0f}%',
+                        filter: {
+                            property: 'percentage',
+                            operator: '>',
+                            value: 4 // 5% 이하 라벨 숨김
+                        },
+                        style: {
+                            textOutline: 'none',
+                            color: '#fff', // 바 내부 글씨는 항상 흰색이 잘 보임 (배경색이 진하므로)
+                            fontWeight: 'bold',
+                            textShadow: '0px 0px 3px black' // 가독성 확보
+                        }
+                    }
+                },
+                series: {
+                    borderRadius: 0
+                }
+            },
+            legend: {
+                reversed: false, // 1급부터 순서대로 표시
+                itemStyle: {
+                    color: 'var(--color-text)', // 범례 글씨 색상
+                    fontWeight: 'bold'
+                },
+                itemHoverStyle: {
+                    color: 'var(--color-primary)'
+                }
+            },
+            credits: { enabled: false },
+            series: seriesData
+        });
+    }
 
 
     document.addEventListener('DOMContentLoaded', function () {
         loadHighcharts(function () {
-            // 초기 데이터 세팅 (서버에서 받은걸로) - JSON Script parsing pattern
+            // 1. 종합 원그래프 (기존 로직)
             let initialLabels = [];
             let initialData = [];
+            let fileStats = [];
 
             try {
                 const labelsEl = document.getElementById('viz-data-labels');
                 const dataEl = document.getElementById('viz-data-data');
+                const fileStatsEl = document.getElementById('viz-file-stats');
 
-                if (labelsEl && labelsEl.textContent.trim()) {
-                    initialLabels = JSON.parse(labelsEl.textContent);
-                }
-                if (dataEl && dataEl.textContent.trim()) {
-                    initialData = JSON.parse(dataEl.textContent);
-                }
+                if (labelsEl && labelsEl.textContent.trim()) initialLabels = JSON.parse(labelsEl.textContent);
+                if (dataEl && dataEl.textContent.trim()) initialData = JSON.parse(dataEl.textContent);
+                if (fileStatsEl && fileStatsEl.textContent.trim()) fileStats = JSON.parse(fileStatsEl.textContent);
+
             } catch (e) {
                 console.error("[visualization.html] Error parsing visualization data:", e);
-                // Fail gracefully
             }
 
+            // Render Overall Chart
             const gradeColors = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#64748b'];
+            if (initialLabels.length > 0) {
+                const chartData = initialLabels.map((label, index) => {
+                    const gradeNum = parseInt(label.replace(/[^0-9]/g, ''));
+                    return {
+                        name: label,
+                        y: initialData[index],
+                        color: gradeColors[gradeNum - 1],
+                        gradeIndex: gradeNum
+                    };
+                });
 
-            if (!initialLabels || initialLabels.length === 0) {
-                const chartDiv = document.getElementById('gradeChart');
-                if (chartDiv) chartDiv.innerHTML = '<p style="text-align:center; color:#999;">표시할 데이터가 없습니다.</p>';
-                return;
-            }
-
-            const chartData = initialLabels.map((label, index) => {
-                const gradeNum = parseInt(label.replace(/[^0-9]/g, ''));
-                return {
-                    name: label,
-                    y: initialData[index],
-                    color: gradeColors[gradeNum - 1],
-                    gradeIndex: gradeNum
-                };
-            });
-
-            gradeChartInstance = Highcharts.chart('gradeChart', {
-                chart: {
-                    type: 'pie',
-                    options3d: { enabled: true, alpha: 45, beta: 0 },
-                    backgroundColor: 'transparent',
-                    height: 400
-                },
-                title: { text: '' },
-                tooltip: { pointFormat: '{series.name}: <b>{point.y}개 ({point.percentage:.1f}%)</b>' },
-                plotOptions: {
-                    pie: {
-                        allowPointSelect: true,
-                        cursor: 'pointer',
-                        depth: 35,
-                        dataLabels: {
-                            enabled: true,
-                            format: '{point.name}',
-                            style: { fontSize: '20px', fontWeight: 'bold', color: 'var(--color-text)' }
-                        },
-                        point: {
-                            events: {
-                                mouseOver: function () {
-                                    const targetClass = `text-grade-${this.gradeIndex}`;
-                                    document.querySelectorAll(`.${targetClass}`).forEach(el => el.classList.add('highlight-active'));
-                                },
-                                mouseOut: function () {
-                                    document.querySelectorAll('.interactive-word').forEach(el => el.classList.remove('highlight-active'));
+                gradeChartInstance = Highcharts.chart('gradeChart', {
+                    chart: {
+                        type: 'pie',
+                        options3d: { enabled: true, alpha: 45, beta: 0 },
+                        backgroundColor: 'transparent',
+                        height: 400
+                    },
+                    title: { text: '' },
+                    tooltip: { pointFormat: '{series.name}: <b>{point.y}개 ({point.percentage:.1f}%)</b>' },
+                    plotOptions: {
+                        pie: {
+                            allowPointSelect: true,
+                            cursor: 'pointer',
+                            depth: 35,
+                            dataLabels: {
+                                enabled: true,
+                                format: '{point.name}',
+                                style: { fontSize: '20px', fontWeight: 'bold', color: 'var(--color-text)' }
+                            },
+                            point: {
+                                events: {
+                                    mouseOver: function () {
+                                        const targetClass = `text-grade-${this.gradeIndex}`;
+                                        document.querySelectorAll(`.${targetClass}`).forEach(el => el.classList.add('highlight-active'));
+                                    },
+                                    mouseOut: function () {
+                                        document.querySelectorAll('.interactive-word').forEach(el => el.classList.remove('highlight-active'));
+                                    }
                                 }
                             }
                         }
-                    }
-                },
-                series: [{ name: '개수', data: chartData }],
-                credits: { enabled: false }
-            });
+                    },
+                    series: [{ name: '개수', data: chartData }],
+                    credits: { enabled: false }
+                });
+            }
+
+            // 2. 파일별 비교 차트 (New)
+            if (fileStats && fileStats.length > 0) {
+                renderComparisonChart(fileStats);
+            } else {
+                const comparisonDiv = document.getElementById('fileComparisonChart');
+                if (comparisonDiv) comparisonDiv.innerHTML = '<p style="text-align:center; color:var(--color-text-muted); padding:2rem;">비교할 파일 데이터가 없습니다.</p>';
+            }
         });
     });
 </script>
 
 <style>
+    /* Tab Styling */
+    .nav-tabs {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 2rem;
+        background: var(--color-card-bg);
+        /* 배경색 일치 */
+        border-radius: 99px;
+        /* 둥근 캡슐 모양 */
+        padding: 0.5rem;
+        border: 1px solid var(--color-card-border);
+        box-shadow: var(--shadow-card);
+        width: fit-content;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .nav-tab {
+        border: none;
+        background: transparent;
+        color: var(--color-text-muted);
+        padding: 0.75rem 1.5rem;
+        border-radius: 99px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .nav-tab:hover {
+        color: var(--color-primary);
+    }
+
+    .nav-tab.active {
+        background: var(--color-primary);
+        color: #fff;
+        box-shadow: 0 4px 10px rgba(168, 85, 247, 0.4);
+    }
+
+    /* Existing Styles */
     .grade-badge {
         display: inline-block;
         border-radius: 12px;
@@ -308,7 +454,7 @@
         background-color: #64748b;
     }
 
-    /* 텍스트 시각화용 (배경색 없음, 글자색만, 기본 밑줄 없음) */
+    /* 텍스트 시각화용 */
     .text-grade-1,
     .text-grade-2,
     .text-grade-3,
@@ -343,15 +489,13 @@
         color: #64748b;
     }
 
-    /* 강조 효과 (Bold + Underline) */
+    /* 강조 효과 */
     .highlight-active {
         font-weight: 900 !important;
         text-decoration: underline;
         text-decoration-thickness: 3px;
         transform: scale(1.1);
-        /* 살짝 커지는 효과 추가 */
         display: inline-block;
-        /* transform 적용 위해 */
         transition: all 0.2s ease;
     }
 </style>
