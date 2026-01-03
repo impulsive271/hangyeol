@@ -22,6 +22,7 @@ def grade():
     debug_log = "" 
     visualization_data = {}
     text_segments = []
+    file_text_contents = [] # [FIX] Initialize for GET requests
 
     if request.method == "POST":
         last_sentence = request.form.get("sentence", "")
