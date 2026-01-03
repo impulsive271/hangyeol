@@ -133,7 +133,7 @@
     {{ visualization_data.data | tojson | default('[]') }}
 </script>
 <script id="viz-file-stats" type="application/json">
-    {{ file_stats_list | tojson | default('[]') }}
+    {{ file_stats_list | default([]) | tojson }}
 </script>
 
 <!-- Highcharts 로드 확인 및 스크립트 실행 -->

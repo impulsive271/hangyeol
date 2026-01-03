@@ -141,10 +141,10 @@ def generate():
         "generate.html", 
         generated_sentence=final_sentence,
         analysis_result=final_analysis,
-        final_grade=final_grade,
         rejected_history=rejected_history,
         visualization_data=visualization_data,
-        text_segments=text_segments
+        text_segments=text_segments,
+        file_stats_list=[] # [FIX] Add empty list to prevent template error
     )
 
 @main_bp.route("/quiz")
