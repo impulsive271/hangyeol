@@ -42,15 +42,24 @@ class AnalysisService:
         grade_stats = {f"{i}급": 0 for i in range(1, 7)}
         grade_stats["등급 없음"] = 0
         grade_stats["기타"] = 0
+        grade_stats["전체"] = 0 # [NEW] 합계 (문장부호 제외, 숫자 포함)
         
         for item in analysis_data:
             lvl = item.get('level', '')
             tag = item.get('tag_code', '')
             
-            # [NEW] 문장 부호(S로 시작) 등은 '기타'로 분류
+            # [NEW] 문장 부호(S로 시작) 처리
             if tag and tag.startswith('S'):
                 grade_stats["기타"] += 1
+                
+                # [NEW] 숫자(SN)는 합계에 포함, 나머지는 제외
+                if tag == 'SN':
+                    grade_stats["전체"] += 1
+                
                 continue
+            
+            # S로 시작하지 않는 단어들은 모두 합계에 포함
+            grade_stats["전체"] += 1
 
             if lvl and '급' in lvl:
                 # "1급", "1~2급" 등 처리 (심플하게 첫 숫자 기준)

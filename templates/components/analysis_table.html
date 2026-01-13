@@ -1,6 +1,6 @@
 <div
     style="display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; margin-bottom: 0.8rem;">
-    <h4 style="margin: 0; font-weight: 700; color: var(--color-text);">📊 상세 분석 결과</h4>
+    <h4 id="section-analysis" style="margin: 0; font-weight: 700; color: var(--color-text);">📊 상세 분석 결과</h4>
     <div>
         <button type="button" class="outline contrast"
             onclick="downloadTableAsCsv('analysis-table', 'analysis_result.csv')"
@@ -22,14 +22,19 @@
                 <th scope="col" style="width: 15%;">표제어</th>
                 <th scope="col" style="width: 20%;">품사</th>
                 <th scope="col" style="width: 10%;">등급</th>
-                <th scope="col" style="width: 15%;">번호</th>
-                <th scope="col">길잡이말</th>
+                <th scope="col" style="width: 40px;">
+                    <!-- Select All Checkbox (Optional, usually for merge we select manually) -->
+                    <input type="checkbox" id="select-all-rows" onclick="toggleSelectAll(this)" style="display:none;">
+                    선택
+                </th>
+                <th scope="col" style="width: 60px;">번호</th>
+                <th scope="col">어절 (원문)</th>
                 <th scope="col" style="width: 60px; text-align: center;">수정</th>
             </tr>
         </thead>
         <tbody>
             {% for row in analysis_result %}
-            <tr data-original-form="{{ row.form }}" data-tag-code="{{ row.tag_code }}"
+            <tr id="{{ row._ui_id }}" data-original-form="{{ row.form }}" data-tag-code="{{ row.tag_code }}"
                 data-offset="{{ row.offset_start }}" data-ui-id="{{ row._ui_id }}" data-filename="{{ row.filename }}">
                 <td class="cell-filename"
                     style="color: var(--color-primary); font-size: 0.9rem; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px;"
@@ -51,9 +56,10 @@
                     <span style="color: var(--color-text-muted);">-</span>
                     {% endif %}
                 </td>
-                <td class="cell-id" style="font-family: monospace; font-size: 0.95rem; color: var(--color-text-muted);">
-                    {{ row.id }}
+                <td style="text-align: center;">
+                    <input type="checkbox" class="row-selector" onchange="handleRowSelection()">
                 </td>
+                <td class="cell-id text-muted" style="text-align: center;">{{ loop.index }}</td>
                 <td class="cell-desc" style="color: var(--color-secondary);">
                     {{ row.desc }}
                 </td>
@@ -94,6 +100,46 @@
             style="max-height: 300px; overflow-y: auto; border: 1px solid var(--muted-border-color); border-radius: 8px; display: none;">
             <!-- 결과 리스트 -->
         </div>
+    </article>
+</dialog>
+
+<!-- [NEW] Floating Merge Button -->
+<div id="floating-merge-btn" style="position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); 
+    background-color: var(--color-primary); color: white; padding: 12px 24px; border-radius: 30px; 
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 1000; display: none; cursor: pointer; font-weight: bold;
+    transition: all 0.3s ease;">
+    <span id="merge-count-badge" style="background: white; color: var(--color-primary); border-radius: 50%; 
+        padding: 2px 8px; margin-right: 8px; font-size: 0.9em;">0</span>
+    선택한 단어 합치기
+</div>
+
+<!-- [NEW] Merge Modal -->
+<dialog id="merge-modal">
+    <article style="min-width: 400px;">
+        <header>
+            <button aria-label="Close" rel="prev" onclick="closeMergeModal()"></button>
+            <h3>단어 합치기</h3>
+        </header>
+        <p>선택한 단어들을 하나로 합칩니다.</p>
+
+        <label for="merge-input-text">합쳐진 단어 (수정 가능)</label>
+        <input type="text" id="merge-input-text">
+
+        <label for="merge-input-grade">새로운 등급</label>
+        <select id="merge-input-grade">
+            <option value="1급">1급 (초급)</option>
+            <option value="2급">2급 (초급)</option>
+            <option value="3급">3급 (중급)</option>
+            <option value="4급">4급 (중급)</option>
+            <option value="5급">5급 (고급)</option>
+            <option value="6급">6급 (고급)</option>
+            <option value="등급 없음">등급 없음</option>
+        </select>
+
+        <footer>
+            <button class="secondary" onclick="closeMergeModal()">취소</button>
+            <button onclick="applyMerge()">확인</button>
+        </footer>
     </article>
 </dialog>
 
@@ -193,6 +239,45 @@
 
     .edit-result-item:last-child {
         border-bottom: none;
+    }
+
+    /* [NEW] Row Highlight System using Transitions (Final Fix) */
+
+    /* 1. Base State (Hidden/Transparent) */
+    /* We don't need a specific base state class, default is none */
+
+    /* 2. Start State: Immediate Appearance */
+    /* Common: Top & Bottom Borders + Background */
+    tr.highlight-start td {
+        background-color: rgba(0, 180, 216, 0.2) !important;
+        box-shadow: inset 0 2px 0 #00b4d8, inset 0 -2px 0 #00b4d8 !important;
+        transition: none !important;
+        /* Force instant apply */
+    }
+
+    /* Left Border for First Cell */
+    tr.highlight-start td:first-child {
+        box-shadow: inset 2px 2px 0 #00b4d8, inset 0 -2px 0 #00b4d8 !important;
+    }
+
+    /* Right Border for Last Cell */
+    tr.highlight-start td:last-child {
+        box-shadow: inset -2px 2px 0 #00b4d8, inset 0 -2px 0 #00b4d8 !important;
+    }
+
+    /* 3. Fade State: Smooth Transition to Transparent (1s Fade) */
+    tr.highlight-start.highlight-fade td {
+        background-color: transparent !important;
+        box-shadow: inset 0 2px 0 transparent, inset 0 -2px 0 transparent !important;
+        transition: background-color 1s ease-out, box-shadow 1s ease-out !important;
+    }
+
+    tr.highlight-start.highlight-fade td:first-child {
+        box-shadow: inset 2px 2px 0 transparent, inset 0 -2px 0 transparent !important;
+    }
+
+    tr.highlight-start.highlight-fade td:last-child {
+        box-shadow: inset -2px 2px 0 transparent, inset 0 -2px 0 transparent !important;
     }
 </style>
 
@@ -393,5 +478,118 @@
 
         // [Moved] Close modal LAST to ensure currentEditingRow remains valid during updates
         closeEditModal();
+    }
+
+    // [NEW] Selection & Merge Logic
+    let selectedRows = [];
+
+    function handleRowSelection() {
+        // Find all selected checkboxes
+        const checkboxes = document.querySelectorAll('.row-selector:checked');
+        selectedRows = Array.from(checkboxes).map(cb => cb.closest('tr'));
+
+        const btn = document.getElementById('floating-merge-btn');
+        const countBadge = document.getElementById('merge-count-badge');
+
+        if (selectedRows.length >= 2) {
+            // Check adjacency (Optional but recommended)
+            // Implementation: Sort by rowIndex and check gaps? 
+            // For now, allow any selection but visually implies adjacency.
+            // User likely selects contiguous.
+
+            btn.style.display = 'block';
+            countBadge.innerText = selectedRows.length;
+
+            // Add click listener
+            btn.onclick = openMergeModal;
+        } else {
+            btn.style.display = 'none';
+        }
+    }
+
+    function openMergeModal() {
+        if (selectedRows.length < 2) return;
+
+        // Sort selected rows by DOM order to ensure correct concatenation
+        selectedRows.sort((a, b) => a.rowIndex - b.rowIndex);
+
+        // Pre-fill merged text
+        const combinedText = selectedRows.map(row => {
+            const formCell = row.querySelector('.cell-form');
+            // If already edited, use text only?
+            // Use dataset.originalForm if available? No, we want CURRENT text.
+            return formCell.innerText.trim();
+        }).join('');
+
+        const modal = document.getElementById('merge-modal');
+        const input = document.getElementById('merge-input-text');
+        input.value = combinedText;
+
+        // Default grade? Maybe max of selected? Or unclassified.
+        document.getElementById('merge-input-grade').value = '등급 없음';
+
+        modal.showModal();
+    }
+
+    function closeMergeModal() {
+        document.getElementById('merge-modal').close();
+    }
+
+    function applyMerge() {
+        const modal = document.getElementById('merge-modal');
+        const newText = document.getElementById('merge-input-text').value.trim();
+        const newGrade = document.getElementById('merge-input-grade').value;
+        const newDesc = "합쳐진 단어"; // Simple desc
+
+        if (!newText) {
+            alert("단어를 입력해주세요.");
+            return;
+        }
+
+        // 1. Update First Row
+        const firstRow = selectedRows[0];
+        const formCell = firstRow.querySelector('.cell-form');
+        const gradeCell = firstRow.querySelector('.cell-grade');
+        const posCell = firstRow.querySelector('.cell-pos');
+        const descCell = firstRow.querySelector('.cell-desc');
+        const idCell = firstRow.querySelector('.cell-id');
+
+        // Update Content
+        formCell.innerText = newText;
+
+        // Grade Badge
+        const gradeNum = newGrade.replace(/[^0-9]/g, '');
+        const badgeColorClass = gradeNum ? `grade-${gradeNum}` : 'grade-none';
+        const badgeStyle = gradeNum ? '' : 'background-color:#94a3b8; color:white;'; // Custom style for '등급 없음' if class missing
+
+        gradeCell.innerHTML = `<span class="grade-badge ${badgeColorClass}" style="font-size: 1rem; padding: 4px 12px; ${badgeStyle}">${newGrade}</span>`;
+
+        posCell.innerHTML = `<span style="font-size:0.8em; color:violet;">(병합됨)</span>`;
+        descCell.innerText = newDesc;
+        idCell.innerText = "수동병합";
+
+        // 2. Remove Other Rows
+        for (let i = 1; i < selectedRows.length; i++) {
+            selectedRows[i].remove();
+        }
+
+        // 3. Call Visualization Update
+        // Provide list of UI IDs to merge
+        if (window.mergeVisualizedText) {
+            const uiIds = selectedRows.map(row => row.dataset.uiId);
+            window.mergeVisualizedText(uiIds, newText, newGrade, newDesc);
+        }
+
+        // 4. Update Charts
+        if (window.refreshGradeChart) {
+            window.refreshGradeChart();
+        }
+
+        // 5. Cleanup
+        modal.close();
+
+        // Reset Selection
+        document.querySelectorAll('.row-selector').forEach(cb => cb.checked = false);
+        handleRowSelection(); // Hide button
     }
 </script>
