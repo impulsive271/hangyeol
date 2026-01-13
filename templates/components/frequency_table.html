@@ -1,0 +1,80 @@
+<!-- Frequency Table Component -->
+<div
+    style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; margin-bottom: 0.5rem;">
+    <h4 id="section-frequency" style="margin: 0; font-weight: 700;">📊 파일별 등급 빈도표</h4>
+    <div>
+        <button type="button" class="outline contrast"
+            onclick="downloadTableAsCsv('frequency-table', 'frequency_stats.csv')"
+            style="padding: 6px 16px; font-size: 0.85rem; margin-bottom: 0; margin-right: 0.5rem;">
+            💾 CSV로 다운로드
+        </button>
+        <button type="button" class="outline contrast" onclick="copyTableText('frequency-table')"
+            style="padding: 6px 16px; font-size: 0.85rem; margin-bottom: 0;">
+            📋 텍스트로 복사
+        </button>
+    </div>
+</div>
+
+<div style="margin-bottom: 1.5rem; overflow-x: auto; text-align: center;">
+    <table id="frequency-table" role="grid" style="text-align: center; width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="border-bottom: 1px solid var(--muted-border-color);">
+                <th style="padding: 10px; min-width: 120px;">파일명</th>
+                <th style="padding: 10px;"><span
+                        style="display:inline-block; border-radius:12px; background-color:#10b981; color:#fff; padding:4px 12px; white-space:nowrap;">1급</span>
+                </th>
+                <th style="padding: 10px;"><span
+                        style="display:inline-block; border-radius:12px; background-color:#3b82f6; color:#fff; padding:4px 12px; white-space:nowrap;">2급</span>
+                </th>
+                <th style="padding: 10px;"><span
+                        style="display:inline-block; border-radius:12px; background-color:#8b5cf6; color:#fff; padding:4px 12px; white-space:nowrap;">3급</span>
+                </th>
+                <th style="padding: 10px;"><span
+                        style="display:inline-block; border-radius:12px; background-color:#f59e0b; color:#fff; padding:4px 12px; white-space:nowrap;">4급</span>
+                </th>
+                <th style="padding: 10px;"><span
+                        style="display:inline-block; border-radius:12px; background-color:#ef4444; color:#fff; padding:4px 12px; white-space:nowrap;">5급</span>
+                </th>
+                <th style="padding: 10px;"><span
+                        style="display:inline-block; border-radius:12px; background-color:#64748b; color:#fff; padding:4px 12px; white-space:nowrap;">6급</span>
+                </th>
+                <th style="padding: 10px;"><span
+                        style="display:inline-block; border-radius:12px; background-color:#94a3b8; color:#fff; padding:4px 12px; white-space:nowrap;">등급
+                        없음</span></th>
+                <th style="padding: 10px;"><span
+                        style="display:inline-block; border-radius:12px; background-color:#475569; color:#fff; padding:4px 12px; white-space:nowrap;">기타</span>
+                </th>
+                <th style="padding: 10px; border-left: 2px solid var(--muted-border-color);">
+                    <span
+                        style="display:inline-block; border-radius:12px; background-color: #000; color: #fff; padding:4px 12px; white-space:nowrap; font-weight: 900;">합계</span>
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in file_stats_list %}
+            <tr style="font-size: 1.1rem; border-bottom: 1px solid rgba(0,0,0,0.05);">
+                <td style="padding: 10px; font-weight:bold; color:var(--color-primary); white-space: nowrap; max-width: 150px; overflow: hidden; text-overflow: ellipsis;"
+                    title="{{ item.filename }}">{{ item.filename }}</td>
+                <td style="padding: 10px;">{{ item.stats['1급'] }}</td>
+                <td style="padding: 10px;">{{ item.stats['2급'] }}</td>
+                <td style="padding: 10px;">{{ item.stats['3급'] }}</td>
+                <td style="padding: 10px;">{{ item.stats['4급'] }}</td>
+                <td style="padding: 10px;">{{ item.stats['5급'] }}</td>
+                <td style="padding: 10px;">{{ item.stats['6급'] }}</td>
+                <td style="padding: 10px;">{{ item.stats['등급 없음'] }}</td>
+                <td style="padding: 10px;">{{ item.stats['기타'] }}</td>
+                <td style="padding: 10px; border-left: 2px solid var(--muted-border-color); font-weight: bold;">{{
+                    item.stats['전체'] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div style="font-size: 0.9rem; color: var(--color-text-muted); margin-bottom: 2rem; text-align: left; padding: 0 1rem;">
+    <p style="margin: 0.2rem 0;">* <strong>합계</strong>: 문장 부호를 제외한 전체 단어 수 (숫자 포함)</p>
+    <p style="margin: 0.2rem 0;">* <strong>기타</strong>: 문장 부호, 숫자 등 분석 대상 외 텍스트</p>
+</div>
+
+<!-- Functions for table actions (if not present globally, though grade.html has them at bottom. We might need to ensure generate.html has them) -->
+<!-- We assume copyTableText and downloadTableAsCsv are global or included in the page script -->

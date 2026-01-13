@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, send_file
 from services.analysis_service import AnalysisService
 from services.generation_service import GenerationService
+from services.visualization_service import VisualizationService
 
 from services.file_processing_service import FileProcessingService
 
@@ -8,6 +9,7 @@ main_bp = Blueprint('main', __name__)
 
 analysis_service = AnalysisService()
 generation_service = GenerationService()
+visualization_service = VisualizationService()
 file_service = FileProcessingService()
 
 @main_bp.route("/")
@@ -33,7 +35,7 @@ def grade():
         for item in analysis_result:
             item['filename'] = '직접 입력'
             
-        visualization_data, text_segments = analysis_service.get_visualization_data(analysis_result, last_sentence)
+        visualization_data, text_segments = visualization_service.get_visualization_data(analysis_result, last_sentence)
         file_text_contents = [{'filename': '직접 입력', 'segments': text_segments}]
 
     return render_template("grade.html", 
@@ -85,7 +87,7 @@ def grade_upload():
 
             # [NEW] 개별 파일 시각화 데이터 생성 (텍스트 세그먼트용)
             # Pie Chart용 카운트 누적
-            _, temp_segments = analysis_service.get_visualization_data(analysis_result, extracted_text)
+            _, temp_segments = visualization_service.get_visualization_data(analysis_result, extracted_text)
             file_text_contents.append({
                 'filename': filename,
                 'segments': temp_segments
@@ -99,10 +101,7 @@ def grade_upload():
         full_extracted_text = "\n\n".join(combined_text)
         
         # 종합 Pie Chart 데이터 재구성
-        visualization_data = {
-            "labels": [k for k, v in overall_grade_counts.items() if v > 0],
-            "data": [v for v in overall_grade_counts.values() if v > 0]
-        }
+        visualization_data = visualization_service.create_chart_data_from_stats(overall_grade_counts)
         
         # grade.html 렌더링
         return render_template("grade.html", 
@@ -135,7 +134,25 @@ def generate():
         )
 
     if final_sentence:
-        visualization_data, text_segments = analysis_service.get_visualization_data(final_analysis, final_sentence)
+        visualization_data, text_segments = visualization_service.get_visualization_data(final_analysis, final_sentence)
+        # [NEW] Wrap in file_text_contents for visualization.html compatibility
+        file_text_contents = [{
+            'filename': '생성 결과',
+            'segments': text_segments
+        }]
+        
+        # [NEW] Calculate stats for Frequency Table
+        # We can re-use get_sentence_grade or calculate manually from final_analysis.
+        # Since get_sentence_grade is robust, let's use that (it's fast for one sentence).
+        stats, _, _ = analysis_service.get_sentence_grade(final_sentence)
+        file_stats_list = [{
+            'filename': '생성 결과',
+            'stats': stats
+        }]
+    else:
+        file_text_contents = []
+        file_stats_list = []
+
 
     return render_template(
         "generate.html", 
@@ -143,8 +160,8 @@ def generate():
         analysis_result=final_analysis,
         rejected_history=rejected_history,
         visualization_data=visualization_data,
-        text_segments=text_segments,
-        file_stats_list=[] # [FIX] Add empty list to prevent template error
+        file_text_contents=file_text_contents,
+        file_stats_list=file_stats_list # [NEW] Pass calculated stats
     )
 
 @main_bp.route("/quiz")

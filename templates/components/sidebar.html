@@ -1,0 +1,100 @@
+<div id="quick-menu-container">
+    <button id="quick-menu-toggle" onclick="toggleQuickMenu()" title="메뉴 숨기기/보기">▶</button>
+    <nav id="quick-menu">
+        <ul>
+            <li><a href="#section-input" title="텍스트 입력">🚀 입력</a></li>
+            <li><a href="#section-frequency" title="등급 빈도표">📊 빈도표</a></li>
+            <li><a href="#section-charts" title="등급 그래프">🍰 그래프</a></li>
+            <li><a href="#section-text" title="시각화된 원문">📝 원문</a></li>
+            <li><a href="#section-analysis" title="상세 분석 결과">📋 상세표</a></li>
+        </ul>
+    </nav>
+</div>
+
+<style>
+    #quick-menu-container {
+        position: fixed;
+        right: 20px;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        transition: transform 0.3s ease;
+    }
+
+    /* 닫힘 상태: 화면 밖으로 이동 */
+    #quick-menu-container.collapsed {
+        transform: translate(calc(100% - 30px), -50%);
+    }
+
+    #quick-menu-toggle {
+        background-color: var(--color-card-bg);
+        border: 1px solid var(--muted-border-color);
+        border-right: none;
+        border-radius: 8px 0 0 8px;
+        width: 30px;
+        height: 40px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8rem;
+        color: var(--color-text-muted);
+        box-shadow: -4px 4px 12px rgba(0, 0, 0, 0.05);
+        padding: 0;
+        margin: 0;
+        z-index: 1001;
+    }
+
+    #quick-menu {
+        background-color: var(--color-card-bg);
+        border: 1px solid var(--muted-border-color);
+        border-radius: 0 12px 12px 12px;
+        padding: 10px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(10px);
+        min-width: 100px;
+    }
+
+    #quick-menu ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    #quick-menu li a {
+        display: block;
+        padding: 8px 12px;
+        border-radius: 8px;
+        color: var(--color-text-muted);
+        text-decoration: none;
+        font-size: 0.9rem;
+        font-weight: 600;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+
+    #quick-menu li a:hover {
+        background-color: var(--color-bg);
+        color: var(--color-primary);
+        transform: translateX(-3px);
+    }
+</style>
+
+<script>
+    function toggleQuickMenu() {
+        const container = document.getElementById('quick-menu-container');
+        const btn = document.getElementById('quick-menu-toggle');
+        container.classList.toggle('collapsed');
+
+        if (container.classList.contains('collapsed')) {
+            btn.innerHTML = '◀';
+        } else {
+            btn.innerHTML = '▶';
+        }
+    }
+</script>

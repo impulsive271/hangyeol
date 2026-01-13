@@ -22,14 +22,9 @@
                 <th scope="col" style="width: 15%;">표제어</th>
                 <th scope="col" style="width: 20%;">품사</th>
                 <th scope="col" style="width: 10%;">등급</th>
-                <th scope="col" style="width: 40px;">
-                    <!-- Select All Checkbox (Optional, usually for merge we select manually) -->
-                    <input type="checkbox" id="select-all-rows" onclick="toggleSelectAll(this)" style="display:none;">
-                    선택
-                </th>
-                <th scope="col" style="width: 60px;">번호</th>
-                <th scope="col">어절 (원문)</th>
-                <th scope="col" style="width: 60px; text-align: center;">수정</th>
+                <th scope="col">길잡이말</th>
+                <!-- <th scope="col" style="width: 60px; text-align: center;">수정</th> --> <!-- Old Edit -->
+                <th scope="col" style="width: 60px; text-align: center;">수정</th> <!-- New Edit Checkbox -->
             </tr>
         </thead>
         <tbody>
@@ -56,17 +51,15 @@
                     <span style="color: var(--color-text-muted);">-</span>
                     {% endif %}
                 </td>
-                <td style="text-align: center;">
-                    <input type="checkbox" class="row-selector" onchange="handleRowSelection()">
-                </td>
-                <td class="cell-id text-muted" style="text-align: center;">{{ loop.index }}</td>
                 <td class="cell-desc" style="color: var(--color-secondary);">
                     {{ row.desc }}
                 </td>
                 <td style="text-align: center;">
-                    <button class="btn-edit-row" onclick="openEditModal(this)" title="등급 수동 수정">
-                        ✏️
-                    </button>
+                    <!-- Old Edit Button (Commented Out) -->
+                    <!-- <button class="btn-edit-row" onclick="openEditModal(this)" title="등급 수동 수정">✏️</button> -->
+
+                    <!-- New Edit Checkbox -->
+                    <input type="checkbox" class="row-selector" onchange="handleRowSelection()">
                 </td>
             </tr>
             {% endfor %}
@@ -110,7 +103,7 @@
     transition: all 0.3s ease;">
     <span id="merge-count-badge" style="background: white; color: var(--color-primary); border-radius: 50%; 
         padding: 2px 8px; margin-right: 8px; font-size: 0.9em;">0</span>
-    선택한 단어 합치기
+    선택한 단어 수정하기
 </div>
 
 <!-- [NEW] Merge Modal -->
@@ -142,6 +135,41 @@
         </footer>
     </article>
 </dialog>
+
+<!-- [NEW] Selection Edit Modal -->
+<dialog id="selection-edit-modal">
+    <article style="min-width: 600px; max-width: 90vw; padding: 1rem;">
+        <header style="padding-bottom: 0.5rem;">
+            <button aria-label="Close" rel="prev" onclick="closeSelectionEditModal()"></button>
+            <h3 style="font-size: 1.1rem; margin: 0;">선택한 단어 수정하기</h3>
+        </header>
+
+        <div style="max-height: 60vh; overflow-y: auto; margin: 0.5rem 0;">
+            <table class="striped" id="selection-edit-table"
+                style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                <thead>
+                    <tr>
+                        <th style="padding: 6px 8px;">파일명</th>
+                        <th style="padding: 6px 8px;">표제어</th>
+                        <th style="padding: 6px 8px;">품사</th>
+                        <th style="padding: 6px 8px;">등급</th>
+                        <th style="padding: 6px 8px;">길잡이말</th>
+                        <th style="padding: 6px 12px; text-align: center; min-width: 60px;">수정</th>
+                    </tr>
+                </thead>
+                <tbody id="selection-edit-tbody">
+                    <!-- JS populate -->
+                </tbody>
+            </table>
+        </div>
+
+        <footer style="display: flex; gap: 10px; justify-content: flex-end; padding-top: 0.5rem;">
+            <button class="secondary" onclick="closeSelectionEditModal()" style="padding: 0.4rem 1rem;">취소</button>
+            <button onclick="confirmSelectionEdits()" style="padding: 0.4rem 1rem;">확인</button>
+        </footer>
+    </article>
+</dialog>
+
 
 <style>
     .table-container {
@@ -241,6 +269,45 @@
         border-bottom: none;
     }
 
+    /* [NEW] Merge Button Styles */
+    .merge-btn {
+        background: transparent !important;
+        /* Force transparent */
+        border: 1px solid var(--color-primary);
+        color: var(--color-primary);
+        border-radius: 50%;
+        width: 28px;
+        height: 28px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        padding: 0;
+        opacity: 0.5;
+    }
+
+    .merge-btn:hover {
+        opacity: 1;
+        /* background: var(--color-primary); REMOVED background fill on hover */
+        border-color: var(--color-primary);
+        color: var(--color-primary);
+        font-weight: bold;
+        transform: scale(1.1);
+        box-shadow: 0 0 5px rgba(var(--color-primary-rgb), 0.3);
+        /* Subtle glow instead */
+    }
+
+    .merge-button-row {
+        background: transparent !important;
+    }
+
+    .merge-button-row td {
+        border: none !important;
+        background: transparent !important;
+    }
+
+
     /* [NEW] Row Highlight System using Transitions (Final Fix) */
 
     /* 1. Base State (Hidden/Transparent) */
@@ -285,13 +352,19 @@
     let currentEditingRow = null;
     let localDebounceTimer; // [NEW] 디바운싱 타이머
 
-    function openEditModal(btn) {
-        currentEditingRow = btn.closest('tr');
+    function openEditModal(btnOrRow, initialSearchText = null) {
+        // [MODIFIED] Accept Button or Row Element
+        if (btnOrRow.tagName === 'TR') {
+            currentEditingRow = btnOrRow;
+        } else {
+            currentEditingRow = btnOrRow.closest('tr');
+        }
         const modal = document.getElementById('word-edit-modal');
         modal.showModal();
 
         // [NEW] Auto-Search Implementation
-        const originalForm = currentEditingRow.dataset.originalForm || currentEditingRow.querySelector('.cell-form').innerText;
+        // Use provided initialSearchText (merged form) or fallback to original form
+        const originalForm = initialSearchText || currentEditingRow.dataset.originalForm || currentEditingRow.querySelector('.cell-form').innerText;
         const tagCode = currentEditingRow.dataset.tagCode || ""; // Get tag code
 
         const searchInput = document.getElementById('edit-search-input');
@@ -304,12 +377,14 @@
             typeSelect.value = 'word';
         }
 
-        searchInput.value = originalForm; // Pre-fill
+        searchInput.value = originalForm; // Pre-fill with correct form
         searchInput.focus();
 
         // Trigger search immediately with correct type
         searchForEdit(originalForm, typeSelect.value);
     }
+
+
 
     function closeEditModal() {
         const modal = document.getElementById('word-edit-modal');
@@ -417,66 +492,88 @@
         if (!currentEditingRow) return;
 
         // [NEW] Text Cleaning Logic
-        // 1. Remove trailing numbers (e.g., "신문02" -> "신문")
-        // 2. Remove leading/trailing hyphens/tildes (e.g., "-을까" -> "을까")
         let cleanText = item.text || item.word || "";
         cleanText = cleanText.replace(/[0-9]+$/, '');
         cleanText = cleanText.replace(/^[-~]+|[-~]+$/g, '');
 
-        // 1. 표제어 (원래 -> 새거)
-        const originalForm = currentEditingRow.dataset.originalForm || currentEditingRow.querySelector('.cell-form').innerText;
-        // 만약 이미 수정된 상태라면 originalForm 유지
-        if (!currentEditingRow.dataset.originalForm) {
-            currentEditingRow.dataset.originalForm = originalForm;
-        }
+        // 1. Check Context: Main Table or Selection Modal?
+        const isInsideModal = currentEditingRow.closest('#selection-edit-modal');
 
-        const formCell = currentEditingRow.querySelector('.cell-form');
-        // 같은 단어면 그대로, 다르면 화살표 표시
-        if (originalForm === cleanText) {
-            formCell.innerText = cleanText;
+        // Common Logic: HTML for Cells
+        // Form
+        // If merged row in modal, we shouldn't show arrow. Just new text.
+        // Wait, currentEditingRow in modal *is* the one we want to update.
+        const originalForm = currentEditingRow.dataset.originalForm || currentEditingRow.querySelector(isInsideModal ? '.modal-cell-form' : '.cell-form').innerText.trim();
+
+        let formHtml = '';
+        if (isInsideModal && currentEditingRow.dataset.merged === 'true') {
+            formHtml = cleanText; // Merged rows just show new text
         } else {
-            formCell.innerHTML = `<span style="text-decoration: line-through; color: #999; font-weight:normal;">${originalForm}</span> ➜ ${cleanText}`;
+            if (originalForm === cleanText) {
+                formHtml = cleanText;
+            } else {
+                formHtml = `<span style="text-decoration: line-through; color: #999; font-weight:normal;">${originalForm}</span> ➜ ${cleanText}`;
+            }
         }
 
-        // 2. 품사
+        // POS
+        const posHtml = `<span>${item.pos}</span> <span style="font-size:0.7em; color:violet;">(수정됨)</span>`;
+
+        // Grade
+        const gradeNum = item.grade.replace(/[^0-9]/g, '');
+        const badgeColorClass = gradeNum ? `grade-${gradeNum}` : 'grade-none';
+        const badgeStyle = gradeNum ? '' : 'background-color:#94a3b8; color:white;';
+        const gradeHtml = `<span class="grade-badge ${badgeColorClass}" style="font-size: 1rem; padding: 4px 12px; ${badgeStyle}">${item.grade}</span>`;
+
+        // Desc
+        const descText = item.desc || item.meaning;
+
+        if (isInsideModal) {
+            // [MODAL CONTEXT] Update Modal Row only
+            currentEditingRow.querySelector('.modal-cell-form').innerHTML = formHtml;
+            currentEditingRow.querySelector('.modal-cell-pos').innerHTML = posHtml;
+            currentEditingRow.querySelector('.modal-cell-grade').innerHTML = gradeHtml;
+            currentEditingRow.querySelector('.modal-cell-desc').innerText = descText;
+
+            // Mark as edited
+            const uiId = currentEditingRow.dataset.uiId;
+            window.modalEditedRows.add(uiId);
+
+            // Save applied data to row dataset for later confirmation
+            currentEditingRow.dataset.finalForm = cleanText;
+            currentEditingRow.dataset.finalPos = item.pos;
+            currentEditingRow.dataset.finalGrade = item.grade;
+            currentEditingRow.dataset.finalDesc = descText;
+            currentEditingRow.dataset.finalTagCode = ""; // If available from item?
+
+            closeEditModal();
+            return; // STOP here. Do not update main table yet.
+        }
+
+        // [MAIN TABLE CONTEXT] Update Immediately
+        const formCell = currentEditingRow.querySelector('.cell-form');
+        formCell.innerHTML = formHtml;
+
         const posCell = currentEditingRow.querySelector('.cell-pos');
-        posCell.innerHTML = `<span>${item.pos}</span> <span style="font-size:0.7em; color:violet;">(수정됨)</span>`;
+        posCell.innerHTML = posHtml;
 
-        // 3. 등급 (Keep original solid badges in the table, user only asked for SEARCH results to be changed)
         const gradeCell = currentEditingRow.querySelector('.cell-grade');
-        const gradeNum = item.grade.replace('급', '');
-        gradeCell.innerHTML = `<span class="grade-badge grade-${gradeNum}" style="font-size: 1rem; padding: 4px 12px;">${item.grade}</span>`;
+        gradeCell.innerHTML = gradeHtml;
 
-        // 4. 번호 (ID)
-        const idCell = currentEditingRow.querySelector('.cell-id');
-        idCell.innerText = "수동교정";
-
-        // 5. 길잡이말
         const descCell = currentEditingRow.querySelector('.cell-desc');
-        descCell.innerText = item.desc || item.meaning;
+        descCell.innerText = descText;
 
-        // [NEW] Refresh Full UI (Pie Chart + Overall Grade + Visualized Text)
-        if (window.refreshGradeChart) {
-            window.refreshGradeChart(); // Internally calls updateOverallGrade
-        }
+        const idCell = currentEditingRow.querySelector('.cell-id');
+        if (idCell) idCell.innerText = "수동교정";
 
+        // Refresh Full UI
+        if (window.refreshGradeChart) window.refreshGradeChart();
         if (window.updateVisualizedText) {
             const offset = currentEditingRow.dataset.offset;
             const uiId = currentEditingRow.dataset.uiId;
-            // Use cleaned text for visualization as well
-            const newText = cleanText;
-
-            // Robustly get original form (try dataset first, then cell text)
-            let originalForm = currentEditingRow.dataset.originalForm;
-            if (!originalForm) {
-                const formCell = currentEditingRow.querySelector('.cell-form');
-                if (formCell) originalForm = formCell.innerText.trim();
-            }
-
-            window.updateVisualizedText(offset, item.grade, item.desc || item.meaning, newText, originalForm || "", uiId);
+            window.updateVisualizedText(offset, item.grade, descText, cleanText, originalForm, uiId);
         }
 
-        // [Moved] Close modal LAST to ensure currentEditingRow remains valid during updates
         closeEditModal();
     }
 
@@ -489,46 +586,273 @@
         selectedRows = Array.from(checkboxes).map(cb => cb.closest('tr'));
 
         const btn = document.getElementById('floating-merge-btn');
-        const countBadge = document.getElementById('merge-count-badge');
 
-        if (selectedRows.length >= 2) {
-            // Check adjacency (Optional but recommended)
-            // Implementation: Sort by rowIndex and check gaps? 
-            // For now, allow any selection but visually implies adjacency.
-            // User likely selects contiguous.
-
+        if (selectedRows.length >= 1) { // [MODIFIED] Allow 1+ selection
             btn.style.display = 'block';
-            countBadge.innerText = selectedRows.length;
 
-            // Add click listener
-            btn.onclick = openMergeModal;
+            // [MODIFIED] Open Selection Edit Modal
+            btn.innerHTML = `<span id="merge-count-badge" style="background: white; color: var(--color-primary); border-radius: 50%; padding: 2px 8px; margin-right: 8px; font-size: 0.9em;">${selectedRows.length}</span> 선택한 단어 수정하기`;
+            btn.onclick = openSelectionEditModal;
         } else {
             btn.style.display = 'none';
         }
     }
 
-    function openMergeModal() {
-        if (selectedRows.length < 2) return;
+    function openSelectionEditModal() {
+        if (selectedRows.length < 1) return;
 
-        // Sort selected rows by DOM order to ensure correct concatenation
+        // Sort by row index
         selectedRows.sort((a, b) => a.rowIndex - b.rowIndex);
 
-        // Pre-fill merged text
-        const combinedText = selectedRows.map(row => {
-            const formCell = row.querySelector('.cell-form');
-            // If already edited, use text only?
-            // Use dataset.originalForm if available? No, we want CURRENT text.
-            return formCell.innerText.trim();
-        }).join('');
+        const tbody = document.getElementById('selection-edit-tbody');
+        tbody.innerHTML = '';
 
-        const modal = document.getElementById('merge-modal');
-        const input = document.getElementById('merge-input-text');
-        input.value = combinedText;
+        // Track merged rows and edited status
+        window.modalMergedRows = [];
+        window.modalEditedRows = new Set();
 
-        // Default grade? Maybe max of selected? Or unclassified.
-        document.getElementById('merge-input-grade').value = '등급 없음';
+        selectedRows.forEach((row, index) => {
+            const tr = document.createElement('tr');
 
-        modal.showModal();
+            // Clone cells
+            const filename = row.querySelector('.cell-filename').innerText.trim();
+            const form = row.querySelector('.cell-form').innerHTML;
+            const pos = row.querySelector('.cell-pos').innerHTML;
+            const grade = row.querySelector('.cell-grade').innerHTML;
+            const desc = row.querySelector('.cell-desc').innerText;
+            const originalUiId = row.dataset.uiId;
+            const offset = row.dataset.offset;
+            const originalForm = row.dataset.originalForm || row.querySelector('.cell-form').innerText;
+            const tagCode = row.dataset.tagCode || "";
+
+            tr.dataset.uiId = originalUiId;
+            tr.dataset.offset = offset;
+            tr.dataset.originalForm = originalForm;
+            tr.dataset.tagCode = tagCode;
+            tr.className = 'modal-row';
+
+            tr.innerHTML = `
+                <td style="padding:6px 8px; font-size:0.9rem; color:var(--color-primary);">${filename}</td>
+                <td class="modal-cell-form" style="padding:6px 8px; font-weight:bold;">${form}</td>
+                <td class="modal-cell-pos" style="padding:6px 8px;">${pos}</td>
+                <td class="modal-cell-grade" style="padding:6px 8px;">${grade}</td>
+                <td class="modal-cell-desc" style="padding:6px 8px; color:var(--color-secondary);">${desc}</td>
+                <td style="padding:6px 12px; text-align:center;">
+                    <button class="btn-edit-row" style="opacity:1;" onclick="triggerEditFromModal('${originalUiId}')">✏️</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+
+            // Add merge button row between adjacent items
+            if (index < selectedRows.length - 1) {
+                const nextRow = selectedRows[index + 1];
+
+                // [FIXED] Check adjacency using rowIndex instead of offset
+                // rowIndex includes header rows, so adjacent data rows differ by 1.
+                if (nextRow.rowIndex - row.rowIndex === 1) {
+                    const mergeRow = document.createElement('tr');
+                    mergeRow.className = 'merge-button-row';
+                    mergeRow.innerHTML = `
+                        <td colspan="6" style="padding: 2px; text-align: center; background: transparent; border: none;">
+                            <button class="merge-btn" onclick="mergeModalRows('${originalUiId}', '${nextRow.dataset.uiId}')" 
+                                title="합치기">
+                                <span style="font-size: 1.2em;">+</span>
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(mergeRow);
+                }
+            }
+        });
+
+        document.getElementById('selection-edit-modal').showModal();
+    }
+
+    function closeSelectionEditModal() {
+        document.getElementById('selection-edit-modal').close();
+        // Clear tracking
+        window.modalMergedRows = [];
+        window.modalEditedRows = new Set();
+    }
+
+    function mergeModalRows(uiId1, uiId2) {
+        const tbody = document.getElementById('selection-edit-tbody');
+        const rows = Array.from(tbody.querySelectorAll('.modal-row'));
+
+        const row1 = rows.find(r => r.dataset.uiId === uiId1);
+        const row2 = rows.find(r => r.dataset.uiId === uiId2);
+
+        if (!row1 || !row2) return;
+
+        // Merge form
+        const form1 = row1.querySelector('.modal-cell-form').innerText.trim();
+        const form2 = row2.querySelector('.modal-cell-form').innerText.trim();
+        const mergedForm = form1 + form2;
+
+        row1.querySelector('.modal-cell-form').innerText = mergedForm;
+        row1.querySelector('.modal-cell-pos').innerHTML = '<span style="color:violet; font-size:0.8em;">(\ubcd1\ud569\ub428)</span>';
+        row1.dataset.merged = 'true';
+        row1.dataset.mergedWith = uiId2;
+
+        // Track this merge
+        window.modalMergedRows.push({ parent: uiId1, child: uiId2, mergedForm });
+
+        // Remove row2 and the merge button BETWEEN row1 and row2
+        // Structure: row1 -> merge-btn -> row2
+        const mergeBtnRow = row1.nextElementSibling;
+
+        if (mergeBtnRow && mergeBtnRow.classList.contains('merge-button-row')) {
+            mergeBtnRow.remove();
+        }
+
+        // Remove row2
+        row2.remove();
+    }
+
+    function triggerEditFromModal(uiId) {
+        // Find original row
+        const originalRow = document.getElementById(uiId);
+
+        // Find modal row to get CURRENT merged text
+        const tbody = document.getElementById('selection-edit-tbody');
+        // We use dataset.uiId. Note: merged rows retain the UI ID of the first/parent.
+        const modalRows = Array.from(tbody.querySelectorAll('.modal-row'));
+        const modalRow = modalRows.find(r => r.dataset.uiId === uiId);
+
+        let currentText = null;
+        if (modalRow) {
+            currentText = modalRow.querySelector('.modal-cell-form').innerText.trim();
+        }
+
+        if (modalRow) {
+            // [FIX] Pass the MODAL row as the editing context
+            openEditModal(modalRow, currentText);
+            // Mark as edited in modal
+            window.modalEditedRows.add(uiId);
+        } else if (originalRow) {
+            // Fallback (shouldn't happen if triggered from modal)
+            openEditModal(originalRow);
+        }
+    }
+
+    function confirmSelectionEdits() {
+        // Check if any merged rows are not edited
+        // Merged parent rows will have dataset.merged === 'true'
+        // But window.modalMergedRows tracks merge actions.
+        // Actually, triggerEditFromModal adds the PARENT uiId to window.modalEditedRows.
+        // So we just need to check if every parent in window.modalMergedRows has been edited.
+
+        // Actually, more robust: Check the modal rows directly.
+        const tbody = document.getElementById('selection-edit-tbody');
+        const modalRows = Array.from(tbody.querySelectorAll('.modal-row'));
+
+        let unEdited = false;
+        modalRows.forEach(row => {
+            if (row.dataset.merged === 'true') {
+                // Check if this row (which is a merge parent) has been edited
+                if (!window.modalEditedRows.has(row.dataset.uiId)) {
+                    unEdited = true;
+                }
+            }
+        });
+
+        if (unEdited) {
+            alert('병합된 단어는 반드시 수정해야 합니다. 오른쪽 "✏️" 버튼을 눌러 수정하세요.');
+            return;
+        }
+
+        // Apply changes to Main Table
+        // 1. Delete consumed children
+        window.modalMergedRows.forEach(merge => {
+            const childRow = document.getElementById(merge.child);
+            if (childRow) childRow.remove();
+        });
+
+        // 2. Update Survivors (Parents & Single Edits)
+        modalRows.forEach(row => {
+            const uiId = row.dataset.uiId;
+            const mainRow = document.getElementById(uiId);
+            if (mainRow) {
+                // Retrieve saved data from applyEdit
+                const newForm = row.dataset.finalForm;
+                const newPos = row.dataset.finalPos;
+                const newGrade = row.dataset.finalGrade;
+                const newDesc = row.dataset.finalDesc;
+
+                // If data exists (meaning it was edited), apply it
+                if (newForm) {
+                    // Form
+                    const formCell = mainRow.querySelector('.cell-form');
+                    // If merged, show clean new text. If single edit, show arrow.
+                    if (row.dataset.merged === 'true') {
+                        formCell.innerText = newForm;
+                    } else {
+                        const original = mainRow.dataset.originalForm || formCell.innerText;
+                        if (original === newForm) formCell.innerText = newForm;
+                        else formCell.innerHTML = `<span style="text-decoration: line-through; color: #999; font-weight:normal;">${original}</span> ➜ ${newForm}`;
+                    }
+
+                    // POS
+                    mainRow.querySelector('.cell-pos').innerHTML = `<span>${newPos}</span> <span style="font-size:0.7em; color:violet;">(수정됨)</span>`;
+
+                    // Grade
+                    const gradeNum = newGrade.replace(/[^0-9]/g, '');
+                    const badgeColorClass = gradeNum ? `grade-${gradeNum}` : 'grade-none';
+                    const badgeStyle = gradeNum ? '' : 'background-color:#94a3b8; color:white;';
+                    mainRow.querySelector('.cell-grade').innerHTML = `<span class="grade-badge ${badgeColorClass}" style="font-size: 1rem; padding: 4px 12px; ${badgeStyle}">${newGrade}</span>`;
+
+                    // Desc
+                    mainRow.querySelector('.cell-desc').innerText = newDesc;
+
+                    // ID
+                    if (mainRow.querySelector('.cell-id')) mainRow.querySelector('.cell-id').innerText = "수동교정";
+
+                    // Update Visualization (Complex part)
+                    // If merged: We need to merge spans. 'consumed children' are gone.
+                    // The parent span should be updated and children removed.
+                    // We can use window.mergeVisualizedText([parent, children...])
+                    if (row.dataset.merged === 'true') {
+                        // Find all children consumed by this parent
+                        // window.modalMergedRows contains pairs.
+                        // Recursive search? Or simple filter.
+                        // Since we support A+B, then if A is parent, B is child.
+                        // But if A+B=AB, then AB+C=ABC?
+                        // mergeModalRows updates dataset.mergedWith on the parent row? NO.
+                        // mergeModalRows pushes to window.modalMergedRows.
+                        // Let's gather all children associated with this parent.
+                        // Simple approach: For this parent UIID, finds all `m.child` where `m.parent` matches?
+                        // Wait, if A+B -> A(p), B(c). Then A(p)+C -> A(p), C(c).
+                        // Yes, all children of A.
+                        const childrenIds = window.modalMergedRows
+                            .filter(m => m.parent === uiId)
+                            .map(m => m.child);
+
+                        if (childrenIds.length > 0 && window.mergeVisualizedText) {
+                            // Combine parent + children
+                            const allIds = [uiId, ...childrenIds];
+                            window.mergeVisualizedText(allIds, newForm, newGrade, newDesc);
+                        }
+                    } else {
+                        // Single edit
+                        if (window.updateVisualizedText) {
+                            window.updateVisualizedText(mainRow.dataset.offset, newGrade, newDesc, newForm, mainRow.dataset.originalForm || "", uiId);
+                        }
+                    }
+                }
+            }
+        });
+
+        // 3. Global Refresh
+        if (window.refreshGradeChart) window.refreshGradeChart();
+
+        // 4. Cleanup
+        closeSelectionEditModal();
+        document.querySelectorAll('.row-selector').forEach(cb => cb.checked = false);
+        const btn = document.getElementById('floating-merge-btn');
+        if (btn) btn.style.display = 'none';
+
+        // Refresh selection button state
+        handleRowSelection();
     }
 
     function closeMergeModal() {
