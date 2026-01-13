@@ -4,7 +4,7 @@
 <div class="visualization-container" style="display: flex; flex-direction: column; gap: 2rem;">
 
     <!-- 1. 탭 네비게이션 -->
-    <div class="nav-tabs">
+    <div id="section-charts" class="nav-tabs">
         <button class="nav-tab active" onclick="openVizTab(event, 'tab-overall')">원그래프</button>
         <button class="nav-tab" onclick="openVizTab(event, 'tab-comparison')">비율막대그림</button>
         <button class="nav-tab" onclick="openVizTab(event, 'tab-absolute')">빈도막대그림</button>
@@ -83,7 +83,7 @@
 
     <!-- 3. 하이라이트 원문 영역 (공통) -->
     <div style="margin-top: 1rem;">
-        <h3 style="margin-bottom: 1rem; font-weight: 700;">📝 시각화된 원문</h3>
+        <h3 id="section-text" style="margin-bottom: 1rem; font-weight: 700;">📝 시각화된 원문</h3>
 
         <!-- [NEW] 파일 선택 드롭다운 -->
         {% if file_text_contents and file_text_contents|length > 1 %}
@@ -102,13 +102,12 @@
 
             {% if file_text_contents %}
             {% for file_item in file_text_contents %}
-            <div id="file-content-{{ loop.index }}" class="file-text-content"
-                style="display: {{ 'block' if loop.first else 'none' }}">
+            <div id="file-content-{{ loop.index }}" class="file-text-content {{ 'active' if loop.first else '' }}">
                 {% for seg in file_item.segments %}
                 {% if seg.type == 'graded' %}
                 <span class="interactive-word {{ seg.class }}" data-grade="{{ seg.class }}"
                     data-offset="{{ seg.info.offset_start }}" data-ui-id="{{ seg.info._ui_id }}"
-                    data-tooltip="{{ seg.info.level }} - {{ seg.info.desc }}">
+                    data-tooltip="{{ seg.info.level }} - {{ seg.info.desc }}" style="cursor: pointer;">
                     {{ seg.text }}
                 </span>
                 {% else %}
@@ -222,6 +221,48 @@
         }
     };
 
+    // [New] Text Click Navigation
+    document.addEventListener('DOMContentLoaded', function () {
+        const textBox = document.getElementById('highlighted-text-box');
+        if (textBox) {
+            textBox.addEventListener('click', function (e) {
+                const target = e.target.closest('.interactive-word');
+                if (target && target.dataset.uiId) {
+                    scrollToRow(target.dataset.uiId);
+                }
+            });
+        }
+    });
+
+    function scrollToRow(uiId) {
+        const row = document.getElementById(uiId);
+        if (row) {
+            // 1. Scroll
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            // 2. Reset (remove classes)
+            row.classList.remove('highlight-start');
+            row.classList.remove('highlight-fade');
+
+            // 3. Force Reflow
+            void row.offsetWidth;
+
+            // 4. Start Highlight (Instant Color)
+            row.classList.add('highlight-start');
+
+            // 5. Trigger Fade (After 2 seconds hold)
+            setTimeout(() => {
+                row.classList.add('highlight-fade');
+            }, 2000);
+
+            // 6. Cleanup (Total 3s: 2s hold + 1s fade)
+            setTimeout(() => {
+                row.classList.remove('highlight-start');
+                row.classList.remove('highlight-fade');
+            }, 3050); // 3000ms + buffer
+        }
+    }
+
     // [New] Toggle Ungraded Series (Bar Chart)
     window.toggleUngradedSeries = function (checkbox) {
         if (!comparisonChartInstance) return;
@@ -232,6 +273,90 @@
             ungradedSeries.setVisible(checkbox.checked);
         }
     };
+
+    // [New] Update Single Visualized Text (Existing)
+    window.updateVisualizedText = function (offset, gradeStr, desc, newText, originalText, uiId) {
+        // Try to find by UI ID first (Robust)
+        let target = null;
+        if (uiId) {
+            target = document.querySelector(`.interactive-word[data-ui-id="${uiId}"]`);
+        }
+
+        // Fallback by offset if needed (though UI ID is preferred)
+        if (!target) {
+            // ... implementation if needed, but UI ID should suffice
+            console.warn("Could not find visualization element with UI ID:", uiId);
+            return;
+        }
+
+        // Update Text
+        target.innerText = newText;
+
+        // Update Class (Grade Color)
+        // Remove old grade class
+        const oldGrade = target.dataset.grade;
+        if (oldGrade) target.classList.remove(oldGrade);
+
+        // Add new grade class
+        // gradeStr example: "1급", "등급 없음"
+        let newClass = 'text-grade-none'; // Default
+        if (gradeStr && gradeStr.includes('급')) {
+            const num = gradeStr.replace(/[^0-9]/g, '');
+            if (num) newClass = `text-grade-${num}`;
+        } else if (gradeStr === '등급 없음') {
+            newClass = 'text-grade-none';
+        }
+
+        target.classList.add(newClass);
+        target.dataset.grade = newClass;
+
+        // Update Tooltip
+        target.dataset.tooltip = `${gradeStr} - ${desc}`;
+    }
+
+    // [New] Merge Visualized Text
+    window.mergeVisualizedText = function (uiIsToMerge, newText, newGradeStr, newDesc) {
+        if (!uiIsToMerge || uiIsToMerge.length < 2) return;
+
+        // 1. Find all elements
+        const elements = [];
+        uiIsToMerge.forEach(id => {
+            const el = document.querySelector(`.interactive-word[data-ui-id="${id}"]`);
+            if (el) elements.push(el);
+        });
+
+        if (elements.length === 0) return;
+
+        // 2. Keep the first one, remove others
+        const firstEl = elements[0];
+
+        // Remove others
+        for (let i = 1; i < elements.length; i++) {
+            elements[i].remove();
+        }
+
+        // 3. Update the first one
+        firstEl.innerText = newText;
+
+        // Update Grade Class
+        const oldGrade = firstEl.dataset.grade;
+        if (oldGrade) firstEl.classList.remove(oldGrade);
+
+        // Determine new class
+        let newClass = 'text-grade-none';
+        if (newGradeStr && newGradeStr.includes('급')) {
+            const num = newGradeStr.replace(/[^0-9]/g, '');
+            if (num) newClass = `text-grade-${num}`;
+        }
+
+        firstEl.classList.add(newClass);
+        firstEl.dataset.grade = newClass;
+
+        // Update Tooltip
+        firstEl.dataset.tooltip = `${newGradeStr} - ${newDesc}`;
+
+        // Add merge indicator? (Optional)
+    }
 
     // [New] Render Comparison Chart (Ratio)
     function renderComparisonChart(fileStats) {
@@ -659,12 +784,10 @@
                     point: {
                         events: {
                             mouseOver: function () {
-                                if (this.gradeIndex === 99) return; // 등급 없음은 하이라이트 제외
-                                const targetClass = `text-grade-${this.gradeIndex}`;
+                                const targetClass = this.gradeIndex === 99 ? 'text-grade-none' : `text-grade-${this.gradeIndex}`;
                                 document.querySelectorAll(`.${targetClass}`).forEach(el => el.classList.add('highlight-active'));
                             },
                             mouseOut: function () {
-                                if (this.gradeIndex === 99) return;
                                 document.querySelectorAll('.interactive-word').forEach(el => el.classList.remove('highlight-active'));
                             }
                         }
@@ -853,5 +976,14 @@
         transform: scale(1.1);
         display: inline-block;
         transition: all 0.2s ease;
+    }
+
+    /* File Content Visibility */
+    .file-text-content {
+        display: none;
+    }
+
+    .file-text-content.active {
+        display: block;
     }
 </style>

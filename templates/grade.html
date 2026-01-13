@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
 <section>
-  <h2>🚀 분석</h2>
+  <h2 id="section-input" style="scroll-margin-top: 100px;">🚀 분석</h2>
   <p>텍스트를 입력하고 제출하면 등급과 상세 분석 표를 확인할 수 있습니다.</p>
 
   <form method="post" class="form" id="grade-form">
@@ -27,11 +27,30 @@
     <summary style="font-weight: bold; cursor: pointer;">📂 파일 업로드 (.txt)</summary>
     <div style="padding: 1rem; border: 1px solid var(--muted-border-color); border-radius: 8px; margin-top: 0.5rem;">
       <form action="{{ url_for('main.grade_upload') }}" method="post" enctype="multipart/form-data" class="grid"
-        style="grid-template-columns: 3fr 1fr; gap: 10px; margin-bottom:0; padding:0; border:none; box-shadow:none; background:transparent; backdrop-filter:none; -webkit-backdrop-filter:none;">
-        <input type="file" name="file" accept=".txt" multiple required>
-        <button type="submit" class="secondary">업로드 및 분석</button>
+        style="grid-template-columns: 1fr; gap: 10px; margin-bottom:0; padding:0; border:none; box-shadow:none; background:transparent; backdrop-filter:none; -webkit-backdrop-filter:none;">
+
+        <!-- [NEW] Hidden Real Input -->
+        <input type="file" id="hidden-file-input" name="file" accept=".txt" multiple style="display: none;">
+
+        <!-- [NEW] Custom UI (Simplified + Drop Zone) -->
+        <div id="drop-zone" class="file-upload-wrapper">
+          <!-- Simple Button (Restored Style) -->
+          <button type="button" class="secondary outline" onclick="document.getElementById('hidden-file-input').click()"
+            style="width: 100%; margin-bottom: 0;">
+            📂 파일 선택 (또는 드래그)
+          </button>
+
+          <!-- File List (Initially Hidden) -->
+          <div id="file-list-container" class="file-list-container" style="display: none;">
+            <!-- JS will populate file blocks here -->
+          </div>
+        </div>
+
+        <button type="submit" class="primary" id="upload-btn" disabled
+          style="display: none; margin-top: 10px; width: 100%;">🚀 분석 시작</button>
       </form>
-      <small style="color: var(--color-text-muted);">※ 현재 <strong>.txt</strong> 파일만 지원합니다.</small>
+      <small style="color: var(--color-text-muted); display: block; margin-top: 10px;">※ <strong>.txt</strong> 파일만
+        지원합니다.</small>
     </div>
   </details>
 
@@ -46,7 +65,7 @@
     <!-- [NEW] 등급 빈도수 테이블 -->
     <div
       style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; margin-bottom: 0.5rem;">
-      <h4 style="margin: 0; font-weight: 700;">📊 파일별 등급 빈도표</h4>
+      <h4 id="section-frequency" style="margin: 0; font-weight: 700;">📊 파일별 등급 빈도표</h4>
       <div>
         <button type="button" class="outline contrast"
           onclick="downloadTableAsCsv('frequency-table', 'frequency_stats.csv')"
@@ -89,6 +108,10 @@
             <th style="padding: 10px;"><span
                 style="display:inline-block; border-radius:12px; background-color:#475569; color:#fff; padding:4px 12px; white-space:nowrap;">기타</span>
             </th>
+            <th style="padding: 10px; border-left: 2px solid var(--muted-border-color);">
+              <span
+                style="display:inline-block; border-radius:12px; background-color: #000; color: #fff; padding:4px 12px; white-space:nowrap; font-weight: 900;">합계</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -105,11 +128,129 @@
             <td style="padding: 10px;">{{ item.stats['6급'] }}</td>
             <td style="padding: 10px;">{{ item.stats['등급 없음'] }}</td>
             <td style="padding: 10px;">{{ item.stats['기타'] }}</td>
+            <td style="padding: 10px; border-left: 2px solid var(--muted-border-color); font-weight: bold;">{{
+              item.stats['전체'] }}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+
+    <!-- [NEW] 표 하단 설명 -->
+    <div
+      style="font-size: 0.9rem; color: var(--color-text-muted); margin-bottom: 2rem; text-align: left; padding: 0 1rem;">
+      <p style="margin: 0.2rem 0;">* <strong>합계</strong>: 문장 부호를 제외한 전체 단어 수 (숫자 포함)</p>
+      <p style="margin: 0.2rem 0;">* <strong>기타</strong>: 문장 부호, 숫자 등 분석 대상 외 텍스트</p>
+    </div>
+
+    <!-- [NEW] Quick Jump Side Menu (Toggleable) -->
+    <div id="quick-menu-container">
+      <button id="quick-menu-toggle" onclick="toggleQuickMenu()" title="메뉴 숨기기/보기">
+        ▶
+      </button>
+      <nav id="quick-menu">
+        <ul>
+          <li><a href="#section-input" title="텍스트 입력">🚀 입력</a></li>
+          <li><a href="#section-frequency" title="등급 빈도표">📊 빈도표</a></li>
+          <li><a href="#section-charts" title="등급 그래프">🍰 그래프</a></li>
+          <li><a href="#section-text" title="시각화된 원문">📝 원문</a></li>
+          <li><a href="#section-analysis" title="상세 분석 결과">📋 상세표</a></li>
+        </ul>
+      </nav>
+    </div>
+
+    <style>
+      #quick-menu-container {
+        position: fixed;
+        right: 20px;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        transition: transform 0.3s ease;
+      }
+
+      /* 닫힘 상태: 화면 밖으로 이동 (버튼만 살짝 보이게 하거나, 완전히 나가고 버튼은 반대편에? User wants toggle button visible) */
+      /* Let's try transform translateX. */
+      #quick-menu-container.collapsed {
+        transform: translate(calc(100% - 30px), -50%);
+        /* 버튼은 보여야 함 */
+      }
+
+      #quick-menu-toggle {
+        background-color: var(--color-card-bg);
+        border: 1px solid var(--muted-border-color);
+        border-right: none;
+        border-radius: 8px 0 0 8px;
+        /* 왼쪽 둥글게 */
+        width: 30px;
+        height: 40px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8rem;
+        color: var(--color-text-muted);
+        box-shadow: -4px 4px 12px rgba(0, 0, 0, 0.05);
+        /* 왼쪽에 그림자 */
+        padding: 0;
+        margin: 0;
+        z-index: 1001;
+      }
+
+      #quick-menu {
+        background-color: var(--color-card-bg);
+        border: 1px solid var(--muted-border-color);
+        border-radius: 0 12px 12px 12px;
+        /* 왼쪽 위는 직각 */
+        padding: 10px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(10px);
+        min-width: 100px;
+      }
+
+      #quick-menu ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      #quick-menu li a {
+        display: block;
+        padding: 8px 12px;
+        border-radius: 8px;
+        color: var(--color-text-muted);
+        text-decoration: none;
+        font-size: 0.9rem;
+        font-weight: 600;
+        transition: all 0.2s;
+        white-space: nowrap;
+      }
+
+      #quick-menu li a:hover {
+        background-color: var(--color-bg);
+        color: var(--color-primary);
+        transform: translateX(-3px);
+      }
+    </style>
+
+    <script>
+      function toggleQuickMenu() {
+        const container = document.getElementById('quick-menu-container');
+        const btn = document.getElementById('quick-menu-toggle');
+        container.classList.toggle('collapsed');
+
+        if (container.classList.contains('collapsed')) {
+          btn.innerHTML = '◀'; // 누르면 나옴
+        } else {
+          btn.innerHTML = '▶'; // 누르면 들어감
+        }
+      }
+    </script>
 
     {% if analysis_result %}
 
@@ -234,7 +375,168 @@
       hiddenInput.value = this.checked ? 'true' : 'false';
       localStorage.setItem('clearOnSubmit', hiddenInput.value);
     });
+
+    // [NEW] File Upload Logic
+    initFileUpload();
   });
+
+  // [NEW] File Upload & Reordering Module
+  function initFileUpload() {
+    const fileInput = document.getElementById('hidden-file-input');
+    const fileListContainer = document.getElementById('file-list-container');
+    const uploadBtn = document.getElementById('upload-btn');
+    const dropZone = document.getElementById('drop-zone');
+
+    // Global array to maintain file order
+    let currentFiles = [];
+
+    // --- 1. File Selection Handler (Input Change) ---
+    fileInput.addEventListener('change', (e) => {
+      handleFiles(Array.from(e.target.files));
+      // Allow re-selecting same file
+      e.target.value = '';
+    });
+
+    // --- 2. OS Drag & Drop Handler ---
+    // Prevent default behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    // Highlight drop zone
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropZone.addEventListener(eventName, () => dropZone.classList.add('highlight'), false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, () => dropZone.classList.remove('highlight'), false);
+    });
+
+    // Handle dropped files
+    dropZone.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      const files = Array.from(dt.files).filter(f => f.name.endsWith('.txt')); // Simple filter
+
+      if (dt.files.length > 0 && files.length === 0) {
+        alert("현재 .txt 파일만 지원합니다.");
+        return;
+      }
+
+      handleFiles(files);
+    });
+
+    // --- 3. Unified File Handler ---
+    function handleFiles(newFiles) {
+      const existingNames = new Set(currentFiles.map(f => f.name));
+      let addedCount = 0;
+
+      newFiles.forEach(f => {
+        if (!existingNames.has(f.name)) {
+          currentFiles.push(f);
+          addedCount++;
+        }
+      });
+
+      if (addedCount > 0) {
+        renderFileList();
+        updateRealInput();
+      }
+    }
+
+    // --- 4. Render List ---
+    function renderFileList() {
+      fileListContainer.innerHTML = '';
+
+      if (currentFiles.length === 0) {
+        fileListContainer.style.display = 'none';
+        uploadBtn.style.display = 'none';
+        uploadBtn.disabled = true;
+        return;
+      }
+
+      fileListContainer.style.display = 'flex';
+      uploadBtn.style.display = 'block';
+      uploadBtn.disabled = false;
+
+      currentFiles.forEach((file, index) => {
+        const block = document.createElement('div');
+        block.className = 'file-block';
+        block.draggable = true;
+        block.dataset.index = index;
+        // Prevent drag from propagating to the parent drop zone
+        block.addEventListener('dragstart', (e) => {
+          e.stopPropagation(); // Stop bubbling to dropZone
+          handleInternalDragStart.call(block, e);
+        });
+
+        block.innerHTML = `
+                <div class="drag-handle">☰</div>
+                <div class="file-name">${file.name}</div>
+                <button type="button" class="remove-btn" onclick="removeFile(${index})">✕</button>
+            `;
+
+        // Internal Sort Drag Events
+        // NOTE: We need separate handlers to avoid conflict with OS drop
+        block.addEventListener('dragover', handleInternalDragOver);
+        block.addEventListener('drop', handleInternalDrop);
+        block.addEventListener('dragenter', (e) => e.preventDefault()); // Necessary
+
+        fileListContainer.appendChild(block);
+      });
+    }
+
+    // --- 5. Remove & Update ---
+    window.removeFile = function (index) {
+      currentFiles.splice(index, 1);
+      renderFileList();
+      updateRealInput();
+    };
+
+    function updateRealInput() {
+      const dataTransfer = new DataTransfer();
+      currentFiles.forEach(file => dataTransfer.items.add(file));
+      fileInput.files = dataTransfer.files;
+    }
+
+    // --- 6. Internal Reordering Logic ---
+    let dragSrcEl = null;
+
+    function handleInternalDragStart(e) {
+      dragSrcEl = this;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', this.dataset.index);
+      this.classList.add('dragging');
+    }
+
+    function handleInternalDragOver(e) {
+      if (e.preventDefault) e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      return false;
+    }
+
+    function handleInternalDrop(e) {
+      if (e.stopPropagation) e.stopPropagation();
+
+      // Ensure we are dropping on a file-block
+      const targetBlock = this.closest('.file-block');
+      if (dragSrcEl && targetBlock && dragSrcEl !== targetBlock) {
+        const srcIndex = parseInt(dragSrcEl.dataset.index);
+        const targetIndex = parseInt(targetBlock.dataset.index);
+
+        const item = currentFiles.splice(srcIndex, 1)[0];
+        currentFiles.splice(targetIndex, 0, item);
+
+        renderFileList();
+        updateRealInput();
+      }
+      return false;
+    }
+  }
 </script>
 
 <style>
@@ -297,6 +599,74 @@
 
   .grade-6 {
     background-color: #64748b;
+  }
+
+  /* File Upload UI */
+  .file-list-container {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .file-block {
+    background-color: var(--color-card-bg);
+    border: 1px solid var(--muted-border-color);
+    border-radius: 6px;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.2s ease;
+    cursor: grab;
+    user-select: none;
+  }
+
+  .file-block:active {
+    cursor: grabbing;
+  }
+
+  /* Dragging State */
+  .file-block.dragging {
+    opacity: 0.4;
+    border: 2px dashed var(--color-primary);
+  }
+
+  .file-block.drag-over {
+    border: 2px solid var(--color-primary);
+    transform: scale(1.02);
+  }
+
+  .drag-handle {
+    color: var(--color-text-muted);
+    cursor: grab;
+    font-size: 1.2rem;
+  }
+
+  .file-name {
+    flex-grow: 1;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .remove-btn {
+    background: none;
+    border: none;
+    color: var(--color-text-muted);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0 5px;
+    transition: color 0.2s;
+    width: auto !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .remove-btn:hover {
+    color: #ef4444;
+    /* Red */
   }
 </style>
 {% endblock %}
