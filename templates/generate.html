@@ -71,22 +71,29 @@
       </button>
     </div>
 
-    {% if analysis_result %}
-    <details style="margin-top: 25px; border: 1px solid #555; border-radius: 8px; overflow: hidden; width: 100%;">
-      <summary style="cursor: pointer; background: rgba(0,0,0,0.2); padding: 12px 15px; font-weight: 600; color: #ccc;">
-        📊 상세 분석 결과 보기
-      </summary>
-      <div style="padding: 20px; background: rgba(0,0,0,0.1);">
-        {% include 'components/analysis_table.html' %}
+    <!-- [NEW] Sidebar -->
+    {% include 'components/sidebar.html' %}
 
-        {% if visualization_data %}
-        <div style="margin-top: 2rem;">
-          {% include 'components/visualization.html' %}
-        </div>
-        {% endif %}
-      </div>
-    </details>
+    <!-- 1. Frequency Table -->
+    {% if file_stats_list %}
+    {% include 'components/frequency_table.html' %}
     {% endif %}
+
+    <!-- 2. Charts & Visualization -->
+    {% if visualization_data %}
+    <div id="section-charts" style="margin-top: 2rem;">
+      {% include 'components/visualization.html' %}
+    </div>
+    {% endif %}
+
+    <!-- 3. Detailed Analysis Table -->
+    {% if analysis_result %}
+    <div id="section-analysis" style="margin-top: 2rem;">
+      <h4 style="font-weight: 700;">📋 상세 분석 결과</h4>
+      {% include 'components/analysis_table.html' %}
+    </div>
+    {% endif %}
+
 
     {% if rejected_history %}
     <div style="margin-top: 20px; border-top: 1px dashed #555; padding-top: 15px;">
@@ -146,6 +153,47 @@
       });
       tagsContainer.appendChild(tag);
     }
+
+    // [Reference] Table util functions copied/adapted for Generate page
+    window.copyTableText = function (tableId) {
+      const table = document.getElementById(tableId);
+      if (!table) return;
+      let textToCopy = "";
+      const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText.trim());
+      textToCopy += headers.join('\t') + '\n';
+      const rows = table.querySelectorAll('tbody tr');
+      rows.forEach(row => {
+        const cells = Array.from(row.querySelectorAll('td')).map(td => td.innerText.replace(/[\r\n]+/g, " ").trim());
+        textToCopy += cells.join('\t') + '\n';
+      });
+      navigator.clipboard.writeText(textToCopy).then(() => alert('복사완료!')).catch(err => alert('실패'));
+    };
+
+    window.downloadTableAsCsv = function (tableId, filename) {
+      const table = document.getElementById(tableId);
+      if (!table) return;
+      let csvContent = "\uFEFF";
+      const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText.trim());
+      csvContent += headers.join(',') + '\n';
+      const rows = table.querySelectorAll('tbody tr');
+      rows.forEach(row => {
+        const cells = Array.from(row.querySelectorAll('td')).map(td => {
+          let text = td.innerText.replace(/[\r\n]+/g, " ").trim();
+          if (text.includes(',')) text = `"${text}"`;
+          return text;
+        });
+        csvContent += cells.join(',') + '\n';
+      });
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename || 'data.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
 
     initSearchModule(function (item) {
       addTag(item.text, item.grade, item.desc);

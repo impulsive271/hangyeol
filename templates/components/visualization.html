@@ -205,9 +205,126 @@
         }
     };
 
-    // Global function to refresh chart from table data (Legacy support for Donut)
+    // [MODIFIED] Global function to refresh chart AND FREQUENCY TABLE from table data
     window.refreshGradeChart = function () {
-        // Legacy support removed to simplify - full reload preferred for this complexity
+        // 1. Recalculate Stats from Main Analysis Table
+        const tableBody = document.querySelector('#analysis-table tbody');
+        if (!tableBody) return;
+
+        // Reset counts
+        const stats = {
+            '1급': 0, '2급': 0, '3급': 0, '4급': 0, '5급': 0, '6급': 0,
+            '등급 없음': 0, '기타': 0, '전체': 0
+        };
+
+        const rows = Array.from(tableBody.querySelectorAll('tr'));
+        rows.forEach(row => {
+            const gradeCell = row.querySelector('.cell-grade');
+            if (gradeCell) {
+                const gradeText = gradeCell.innerText.trim();
+                // Extract number or '등급 없음'
+                if (gradeText.includes('등급 없음') || gradeText === '-') {
+                    stats['등급 없음']++;
+                } else if (gradeText.includes('급')) {
+                    // e.g., "1급"
+                    const match = gradeText.match(/(\d)급/);
+                    if (match && stats[`${match[1]}급`] !== undefined) {
+                        stats[`${match[1]}급`]++;
+                    } else {
+                        stats['기타']++; // Should catch undefined grades
+                    }
+                } else {
+                    stats['기타']++;
+                }
+                stats['전체']++;
+            }
+        });
+
+        // 2. Update Charts (Pie Chart)
+        // Filter out zero-value slices for cleaner chart
+        const newSeriesData = [
+            { name: '1급', y: stats['1급'], color: '#10b981' },
+            { name: '2급', y: stats['2급'], color: '#3b82f6' },
+            { name: '3급', y: stats['3급'], color: '#8b5cf6' },
+            { name: '4급', y: stats['4급'], color: '#f59e0b' },
+            { name: '5급', y: stats['5급'], color: '#ef4444' },
+            { name: '6급', y: stats['6급'], color: '#64748b' },
+            { name: '등급 없음', y: stats['등급 없음'], color: '#94a3b8' }
+        ].filter(item => item.y > 0); // [NEW] Filter: Only show items with count > 0
+
+        // Update Grade Chart (Pie)
+        if (gradeChartInstance) {
+            gradeChartInstance.series[0].setData(newSeriesData, true);
+        }
+
+        // Also update comparison/absolute charts if they exist and logic allows (omitted for now to focus on request)
+
+        // 3. Update Frequency Table
+        // Need to re-aggregate per filename since the table shows per-file stats.
+        const fileStats = {};
+
+        rows.forEach(row => {
+            const filename = row.querySelector('.cell-filename').innerText.trim();
+            if (!fileStats[filename]) {
+                fileStats[filename] = {
+                    '1급': 0, '2급': 0, '3급': 0, '4급': 0, '5급': 0, '6급': 0,
+                    '등급 없음': 0, '기타': 0, '전체': 0
+                };
+            }
+
+            const gradeCell = row.querySelector('.cell-grade');
+            const gradeText = gradeCell.innerText.trim();
+
+            if (gradeText.includes('등급 없음') || gradeText === '-') {
+                fileStats[filename]['등급 없음']++;
+            } else {
+                const match = gradeText.match(/(\d)급/);
+                if (match) fileStats[filename][`${match[1]}급`]++;
+                else fileStats[filename]['기타']++;
+            }
+            fileStats[filename]['전체']++;
+        });
+
+        // Update the HTML Table directly
+        const freqTable = document.getElementById('frequency-table');
+
+        if (freqTable) {
+            const tbody = freqTable.querySelector('tbody');
+            Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+                const fnameCell = tr.querySelector('td:first-child');
+                const fname = fnameCell.innerText.trim();
+
+                if (fileStats[fname]) {
+                    const s = fileStats[fname];
+                    const cells = tr.querySelectorAll('td');
+                    // 0: Filename
+                    cells[1].innerText = s['1급'];
+                    cells[2].innerText = s['2급'];
+                    cells[3].innerText = s['3급'];
+                    cells[4].innerText = s['4급'];
+                    cells[5].innerText = s['5급'];
+                    cells[6].innerText = s['6급'];
+                    cells[7].innerText = s['등급 없음'];
+                    cells[8].innerText = s['기타'];
+                    cells[9].innerText = s['전체'];
+                }
+            });
+        }
+
+        // 4. Update Overall Grade Badge
+        let maxCount = 0;
+        let maxGrade = 0;
+        // Grade precedence logic? Or just most frequent?
+        // Usually 'Overall Grade' is weighted average or most frequent.
+        // Existing logic: window.updateOverallGrade(maxGrade)
+        // Let's find dominant grade.
+        for (let g = 1; g <= 6; g++) {
+            if (stats[`${g}급`] > maxCount) {
+                maxCount = stats[`${g}급`];
+                maxGrade = g;
+            }
+        }
+        window.updateOverallGrade(maxGrade);
     };
 
     window.updateOverallGrade = function (maxGrade) {
@@ -377,7 +494,7 @@
                 name: key,
                 color: gradeColors[index],
                 data: fileStats.map(item => item.stats[key] || 0), // 각 파일별 해당 급수 빈도
-                visible: key !== '등급 없음' // '등급 없음'은 기본적으로 숨김 (체크박스로 제어)
+                visible: true // [MODIFIED] '등급 없음'도 기본적으로 표시
             };
         });
 
@@ -838,8 +955,29 @@
                 console.error("[visualization.html] Error parsing visualization data:", e);
             }
 
-            // Render Overall Chart (initially without ungraded - wait, user wants legend now, so always include)
-            renderOverallChart(globalInitialLabels, globalInitialData);
+            // [Modified] Render Overall Chart using globalFileStats to ensure 'No Grade' is included
+            // (Backend passed labels might exclude it, so we recalculate from full stats)
+            if (globalFileStats && globalFileStats.length > 0) {
+                const aggStats = {
+                    '1급': 0, '2급': 0, '3급': 0, '4급': 0, '5급': 0, '6급': 0,
+                    '등급 없음': 0
+                };
+
+                globalFileStats.forEach(file => {
+                    const s = file.stats;
+                    Object.keys(aggStats).forEach(k => {
+                        aggStats[k] += (s[k] || 0);
+                    });
+                });
+
+                const aggLabels = Object.keys(aggStats);
+                const aggData = aggLabels.map(k => aggStats[k]);
+
+                renderOverallChart(aggLabels, aggData);
+            } else {
+                // Fallback if no file stats (should not happen usually)
+                renderOverallChart(globalInitialLabels, globalInitialData);
+            }
 
             // 2. 파일별 비교 차트 (Ratio & Absolute) + [NEW] 개별 원그래프
             if (globalFileStats && globalFileStats.length > 0) {
@@ -986,4 +1124,84 @@
     .file-text-content.active {
         display: block;
     }
+
+    /* [NEW] Global JS Tooltip Style */
+    #global-viz-tooltip {
+        position: fixed;
+        background-color: var(--color-text);
+        /* Theme aware */
+        color: var(--background-color);
+        padding: 0.5rem 0.8rem;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        white-space: nowrap;
+        pointer-events: none;
+        z-index: 2147483647;
+        /* Highest priority */
+        opacity: 0;
+        transition: opacity 0.1s;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        transform: translate(-50%, -100%);
+        /* Center and move up closer */
+    }
+
+    #global-viz-tooltip::after {
+        /* Arrow */
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -6px;
+        border-width: 6px;
+        border-style: solid;
+        border-color: var(--color-text) transparent transparent transparent;
+    }
+
+    /* [SAFETY] Explicitly disable CSS tooltips */
+    [data-tooltip]::after,
+    [data-tooltip]::before {
+        display: none !important;
+        content: none !important;
+    }
 </style>
+
+<!-- [NEW] Global Tooltip Element -->
+<div id="global-viz-tooltip"></div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const tooltip = document.getElementById('global-viz-tooltip');
+        const container = document.getElementById('highlighted-text-box');
+
+        if (container && tooltip) {
+            container.addEventListener('mouseover', function (e) {
+                const target = e.target.closest('.interactive-word');
+                if (target && target.dataset.tooltip) {
+                    // Set content
+                    tooltip.innerText = target.dataset.tooltip;
+
+                    // Position
+                    const rect = target.getBoundingClientRect();
+                    tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+                    tooltip.style.top = (rect.top - 6) + 'px'; // 6px buffer (Closer)
+
+                    // Show
+                    tooltip.style.opacity = '1';
+                }
+            });
+
+            container.addEventListener('mouseout', function (e) {
+                const target = e.target.closest('.interactive-word');
+                if (target) {
+                    tooltip.style.opacity = '0';
+                }
+            });
+
+            // Optional: Hide on scroll to prevent detachment feeling
+            container.addEventListener('scroll', function () {
+                tooltip.style.opacity = '0';
+            }, { passive: true });
+        }
+    });
+</script>

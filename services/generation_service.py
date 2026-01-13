@@ -43,7 +43,10 @@ class GenerationService:
 
         if keyword:
             hint_str = f" (문맥 힌트: {hint})" if hint and hint != 'nan' else ""
-            prompt += f"\n- 필수 포함 단어: '{keyword}'{hint_str}\n  * 주의: 형태를 변형하지 말고 그대로 포함하세요.\n"
+            # [MODIFIED] Strip digits from keyword for prompt (e.g., '수도02' -> '수도')
+            import re
+            clean_keyword = re.sub(r'[0-9]+$', '', keyword)
+            prompt += f"\n- 필수 포함 단어: '{clean_keyword}'{hint_str}\n  * 주의: 형태를 변형하지 말고 그대로 포함하세요.\n"
         
         prompt += "\n[출력 제약사항]\n1. 설명 금지, 오직 예문 1개만 출력.\n2. 마크다운, 따옴표, 불필요한 기호 사용 금지.\n3. 반드시 한국어 마침표(.)로 끝낼 것."
         
