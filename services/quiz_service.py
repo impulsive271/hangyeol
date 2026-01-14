@@ -1,26 +1,22 @@
-import google.generativeai as genai
+from google import genai
 import json
 from config import Config
 
 class QuizService:
     def __init__(self):
-        self.model = None
+        self.client = None
         self._init_ai()
 
     def _init_ai(self):
         api_key = Config.GOOGLE_API_KEY
         if api_key:
             try:
-                genai.configure(api_key=api_key)
-                self.model = genai.GenerativeModel(
-                    "models/gemini-2.0-flash-lite-preview-02-05", # Quiz might need smarter model? Stick to existing.
-                    generation_config={"response_mime_type": "application/json"}
-                )
+                self.client = genai.Client(api_key=api_key)
             except Exception as e:
                 print(f"⚠️ QuizService AI Init Failed: {e}")
 
     def generate_quiz_item(self, target, level, quiz_type, context_sentence, user_prompt=""):
-        if not self.model: return {"error": "AI 모델 미초기화"}
+        if not self.client: return {"error": "AI 모델 미초기화"}
 
         type_desc = "양자택일(Binary Choice)" if quiz_type == 'binary' else "4지선다(Multiple Choice)"
         
@@ -50,7 +46,12 @@ class QuizService:
 출력 포맷(JSON): {{"question_text": "...", "options": ["..."], "answer_index": 0, "explanation": "..."}}"""
             
         try:
-            raw_response = self.model.generate_content(prompt).text
+            response = self.client.models.generate_content(
+                model="models/gemini-2.0-flash-lite-preview-02-05", # Quiz might need smarter model? Stick to existing.
+                contents=prompt,
+                config={"response_mime_type": "application/json"}
+            )
+            raw_response = response.text
             
             clean_json_str = raw_response.strip().replace("```json", "").replace("```", "")
             clean_json_str = clean_json_str.replace('\n', '').replace('\t', '') 
@@ -67,7 +68,7 @@ class QuizService:
 
     def generate_matching_quiz(self, input_words):
         # Used for /api/generate-matching
-        if not self.model: return {"status": "error", "message": "AI 모델 미초기화"}
+        if not self.client: return {"status": "error", "message": "AI 모델 미초기화"}
 
         prompt = f"""
         당신은 한국어 교육 전문가입니다. 다음 요청에 따라 '단어-뜻 연결 퀴즈' 데이터를 JSON으로 만들어주세요.
@@ -86,7 +87,11 @@ class QuizService:
         """
 
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model="models/gemini-2.0-flash-lite-preview-02-05",
+                contents=prompt,
+                config={"response_mime_type": "application/json"}
+            )
             text_response = response.text.replace('```json', '').replace('```', '').strip()
             quiz_data = json.loads(text_response)
             return {"status": "success", "data": quiz_data}

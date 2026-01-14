@@ -1,9 +1,9 @@
 Flask==3.0.3
-kiwipiepy==0.20.0
-pandas==2.2.2
-numpy==2.0.2
+kiwipiepy==0.22.2
+pandas>=2.4.1
+numpy>=2.3.3
 gunicorn==21.2.0
 requests==2.31.0
-google-generativeai
+google-genai
 python-dotenv
 openpyxl
