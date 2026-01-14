@@ -4,7 +4,7 @@
   <h2 id="section-input" style="scroll-margin-top: 100px;">🚀 분석</h2>
   <p>텍스트를 입력하고 제출하면 등급과 상세 분석 표를 확인할 수 있습니다.</p>
 
-  <form method="post" class="form" id="grade-form">
+  <form method="post" action="{{ url_for('main.grade') }}" class="form" id="grade-form">
     <label for="sentence">텍스트</label>
     <textarea id="sentence" name="sentence" rows="3"
       placeholder="예) 사과가 맛없으면 사과할게요">{{ last_sentence or '' }}</textarea>
@@ -20,7 +20,7 @@
       <input type="hidden" id="clear-toggle-input" name="clear_on_submit" value="false">
     </div>
 
-    <button type="submit">분석하기</button>
+    <button type="submit">📝 텍스트 분석하기</button>
   </form>
 
   <details style="margin-top: 1rem; margin-bottom: 2rem;">
@@ -47,7 +47,7 @@
         </div>
 
         <button type="submit" class="primary" id="upload-btn" disabled
-          style="display: none; margin-top: 10px; width: 100%;">🚀 분석 시작</button>
+          style="display: none; margin-top: 10px; width: 100%;">📂 파일 분석하기</button>
       </form>
       <small style="color: var(--color-text-muted); display: block; margin-top: 10px;">※ <strong>.txt</strong> 파일만
         지원합니다.</small>
