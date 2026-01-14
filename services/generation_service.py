@@ -1,25 +1,21 @@
-import google.generativeai as genai
+from google import genai
 from config import Config
 
 class GenerationService:
     def __init__(self):
-        self.model = None
+        self.client = None
         self._init_ai()
 
     def _init_ai(self):
         api_key = Config.GOOGLE_API_KEY
         if api_key:
             try:
-                genai.configure(api_key=api_key)
-                self.model = genai.GenerativeModel(
-                    "models/gemini-2.0-flash-lite-preview-02-05",
-                    generation_config={"response_mime_type": "text/plain"} # Default to text
-                )
+                self.client = genai.Client(api_key=api_key)
             except Exception as e:
                 print(f"⚠️ GenerationService AI Init Failed: {e}")
 
     def generate_ai_sentence(self, grades, keyword, hint=""):
-        if not self.model: return "오류: AI 모델이 초기화되지 않았습니다."
+        if not self.client: return "오류: AI 모델이 초기화되지 않았습니다."
 
         prompt = "당신은 한국어 어휘 및 난이도 전문 출제위원입니다.\n다음 조건에 맞춰 학습용 예문을 단 하나만 작성하세요.\n"
         
@@ -58,7 +54,12 @@ class GenerationService:
 
         for attempt in range(max_api_retries):
             try:
-                return self.model.generate_content(prompt).text.strip().replace("**", "").replace('"', "")
+                response = self.client.models.generate_content(
+                    model="models/gemini-2.0-flash-lite-preview-02-05",
+                    contents=prompt,
+                    config={"response_mime_type": "text/plain"}
+                )
+                return response.text.strip().replace("**", "").replace('"', "")
             except ResourceExhausted:
                 if attempt < max_api_retries - 1:
                     sleep_time = base_delay * (2 ** attempt)

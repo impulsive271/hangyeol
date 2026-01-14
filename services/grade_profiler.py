@@ -7,8 +7,8 @@ class GradeProfiler:
         self.data = data_service
         self.debug_lines = []
 
-    def _disambiguate_with_ai(self, model, sentence, ambiguous_items):
-        if not model or not ambiguous_items: return {}, "AI 미사용"
+    def _disambiguate_with_ai(self, client, model_name, sentence, ambiguous_items):
+        if not client or not ambiguous_items: return {}, "AI 미사용"
         
         prompt = f"""
         당신은 한국어 어휘 분석기입니다. 아래 문맥을 보고 동음이의어 중 가장 적절한 의미를 고르세요.
@@ -30,7 +30,11 @@ class GradeProfiler:
         
         raw_response = ""
         try:
-            response = model.generate_content(prompt)
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config={"response_mime_type": "application/json"}
+            )
             raw_response = response.text
             
             clean_json_str = raw_response.replace('```json', '').replace('```', '').strip()
@@ -44,12 +48,13 @@ class GradeProfiler:
             error_msg = f"Error: {e} | Raw: {raw_response}"
             return {}, error_msg
 
-    def profile(self, tokens, sentence, ai_model=None):
+    def profile(self, tokens, sentence, client=None, model_name=None):
         """
         형태소 분석 결과(tokens)를 바탕으로 등급을 프로파일링합니다.
         :param tokens: Kiwi 형태소 분석 결과 (Token 객체 리스트 or dict 리스트)
         :param sentence: 원문 문장 (AI 문맥 파악용)
-        :param ai_model: Gemini GenerativeModel 인스턴스 (동음이의어 처리용)
+        :param client: val (동음이의어 처리용)
+        :param model_name: str
         :return: analysis_data (list), max_level (int), debug_log (str)
         """
         self.debug_lines = []
@@ -231,9 +236,9 @@ class GradeProfiler:
             i += 1
             
         # AI 결과 반영 (동음이의어 분석)
-        if ambiguous_items and ai_model:
+        if ambiguous_items and client:
             self.debug_lines.append(f"🤖 AI 동음이의어 분석 시작 ({len(ambiguous_items)}건)...")
-            ai_decisions, raw_log = self._disambiguate_with_ai(ai_model, sentence, ambiguous_items)
+            ai_decisions, raw_log = self._disambiguate_with_ai(client, model_name, sentence, ambiguous_items)
             
             for i, item in enumerate(ambiguous_items):
                 key_idx = str(i)
