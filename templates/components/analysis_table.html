@@ -38,7 +38,8 @@
                 </td>
                 <td class="cell-form" style="font-weight: bold; color: var(--color-text);">{{ row.form }}</td>
                 <td class="cell-pos">
-                    <span data-tooltip="{{ row.tag_code }}" style="border-bottom: 1px dotted #888; cursor: help;">
+                    <span class="pos-tooltip-target" data-tooltip="{{ row.tag_code }}"
+                        style="border-bottom: 1px dotted #888; cursor: help;">
                         {{ row.tag_name }}
                     </span>
                 </td>
@@ -346,7 +347,75 @@
     tr.highlight-start.highlight-fade td:last-child {
         box-shadow: inset -2px 2px 0 transparent, inset 0 -2px 0 transparent !important;
     }
+
+    /* [NEW] Analysis Table Tooltip Style (Copied from Visualization) */
+    #pos-tooltip {
+        position: fixed;
+        background-color: var(--color-text);
+        color: var(--background-color);
+        padding: 0.5rem 0.8rem;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        white-space: nowrap;
+        pointer-events: none;
+        z-index: 2147483647;
+        opacity: 0;
+        transition: opacity 0.1s;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        transform: translate(-50%, -100%);
+    }
+
+    #pos-tooltip::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -6px;
+        border-width: 6px;
+        border-style: solid;
+        border-color: var(--color-text) transparent transparent transparent;
+    }
 </style>
+
+<!-- [NEW] Tooltip Element for Analysis Table -->
+<div id="pos-tooltip"></div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Shared logic with visualization, but independent element
+        const tooltip = document.getElementById('pos-tooltip');
+        // We attach listener to the table body to catch events bubbling up
+        const tableBody = document.querySelector('#analysis-table tbody');
+
+        if (tableBody && tooltip) {
+            tableBody.addEventListener('mouseover', function (e) {
+                const target = e.target.closest('.pos-tooltip-target');
+                if (target && target.dataset.tooltip) {
+                    tooltip.innerText = target.dataset.tooltip;
+
+                    const rect = target.getBoundingClientRect();
+                    tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+                    tooltip.style.top = (rect.top - 6) + 'px';
+
+                    tooltip.style.opacity = '1';
+                }
+            });
+
+            tableBody.addEventListener('mouseout', function (e) {
+                const target = e.target.closest('.pos-tooltip-target');
+                if (target) {
+                    tooltip.style.opacity = '0';
+                }
+            });
+
+            // Hide on scroll
+            window.addEventListener('scroll', function () {
+                tooltip.style.opacity = '0';
+            }, { passive: true });
+        }
+    });
+</script>
 
 <script>
     let currentEditingRow = null;
@@ -466,18 +535,18 @@
                 const bgColor = colorMap[gradeNum] || '#94a3b8';
 
                 div.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div style="text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                            <strong>${item.text}</strong>
-                            ${posText}
-                            ${relatedText}
-                            ${hintText}
-                        </div>
-                        <span style="font-size:0.75em; color:#fff; background:${bgColor}; padding: 2px 6px; border-radius:4px; white-space: nowrap; margin-left: 10px;">
-                            ${item.grade}
-                        </span>
-                    </div>
-                `;
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                <strong>${item.text}</strong>
+                ${posText}
+                ${relatedText}
+                ${hintText}
+            </div>
+            <span style="font-size:0.75em; color:#fff; background:${bgColor}; padding: 2px 6px; border-radius:4px; white-space: nowrap; margin-left: 10px;">
+                ${item.grade}
+            </span>
+        </div>
+        `;
 
                 div.onclick = () => applyEdit(item);
                 list.appendChild(div);
@@ -632,15 +701,15 @@
             tr.className = 'modal-row';
 
             tr.innerHTML = `
-                <td style="padding:6px 8px; font-size:0.9rem; color:var(--color-primary);">${filename}</td>
-                <td class="modal-cell-form" style="padding:6px 8px; font-weight:bold;">${form}</td>
-                <td class="modal-cell-pos" style="padding:6px 8px;">${pos}</td>
-                <td class="modal-cell-grade" style="padding:6px 8px;">${grade}</td>
-                <td class="modal-cell-desc" style="padding:6px 8px; color:var(--color-secondary);">${desc}</td>
-                <td style="padding:6px 12px; text-align:center;">
-                    <button class="btn-edit-row" style="opacity:1;" onclick="triggerEditFromModal('${originalUiId}')">✏️</button>
-                </td>
-            `;
+        <td style="padding:6px 8px; font-size:0.9rem; color:var(--color-primary);">${filename}</td>
+        <td class="modal-cell-form" style="padding:6px 8px; font-weight:bold;">${form}</td>
+        <td class="modal-cell-pos" style="padding:6px 8px;">${pos}</td>
+        <td class="modal-cell-grade" style="padding:6px 8px;">${grade}</td>
+        <td class="modal-cell-desc" style="padding:6px 8px; color:var(--color-secondary);">${desc}</td>
+        <td style="padding:6px 12px; text-align:center;">
+            <button class="btn-edit-row" style="opacity:1;" onclick="triggerEditFromModal('${originalUiId}')">✏️</button>
+        </td>
+        `;
             tbody.appendChild(tr);
 
             // Add merge button row between adjacent items
@@ -653,13 +722,13 @@
                     const mergeRow = document.createElement('tr');
                     mergeRow.className = 'merge-button-row';
                     mergeRow.innerHTML = `
-                        <td colspan="6" style="padding: 2px; text-align: center; background: transparent; border: none;">
-                            <button class="merge-btn" onclick="mergeModalRows('${originalUiId}', '${nextRow.dataset.uiId}')" 
-                                title="합치기">
-                                <span style="font-size: 1.2em;">+</span>
-                            </button>
-                        </td>
-                    `;
+        <td colspan="6" style="padding: 2px; text-align: center; background: transparent; border: none;">
+            <button class="merge-btn" onclick="mergeModalRows('${originalUiId}', '${nextRow.dataset.uiId}')"
+                title="합치기">
+                <span style="font-size: 1.2em;">+</span>
+            </button>
+        </td>
+        `;
                     tbody.appendChild(mergeRow);
                 }
             }

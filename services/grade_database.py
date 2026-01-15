@@ -147,6 +147,7 @@ class GradeDatabase:
             if '조사' in class_str or '보조사' in class_str: keys.append('J')
             if '의존명사' in class_str: keys.append('NB')
             elif '명사' in class_str: keys.append('N')
+            if any(x in class_str for x in ['동사', '형용사', '용언', '표현']): keys.append('V')
             return keys
 
         def register_grammar(key, data_dict, is_main=True):

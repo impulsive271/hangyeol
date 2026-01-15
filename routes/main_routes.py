@@ -48,10 +48,14 @@ def grade():
 
 @main_bp.route("/grade/upload", methods=["POST"])
 def grade_upload():
-    if 'file' not in request.files: return "파일 없음", 400
-    
     files = request.files.getlist('file')
-    if not files or files[0].filename == '': return "파일 이름 없음", 400
+    has_files = files and len(files) > 0 and files[0].filename != ''
+    
+    if not has_files:
+        # 파일이 없으면 텍스트 분석 시도 (Fallback)
+        if request.form.get('sentence', '').strip():
+            return grade()
+        return "파일이 없거나 텍스트 내용이 없습니다.", 400
     
     file_stats_list = []
     combined_analysis_result = []
