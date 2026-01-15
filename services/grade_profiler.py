@@ -161,6 +161,35 @@ class GradeProfiler:
 
                     for key_var in lookup_keys:
 
+                        # [FIX logic] 
+                        # 1. 기능소+기능소 -> 명사 차단 (기존 로직 유지/보완)
+                        # 2. 용언(V)+어미(E) -> 명사 차단 (오인식 방지 강화)
+                        #    예: 하(VV) + 자(EF) -> 하자(N) (차단)
+                        #    예: 얼(VV) + 음(ETN) -> 얼음(N) (차단: 문맥상 동명사형일 수 있음)
+                        
+                        func_tags = {
+                            'XSN', 'XSV', 'XSA', 'XSA-I', 'XSV-I', 
+                            'EP', 'EF', 'EC', 'ETN', 'ETM', 
+                            'JKS', 'JKC', 'JKG', 'JKO', 'JKB', 'JKV', 'JKQ', 'JX', 'JC'
+                        }
+                        predicate_tags = {
+                            'VV', 'VA', 'VX', 'VCP', 'VCN', 'VV-I', 'VA-I', 'VX-I', 'VV-R', 'VA-R'
+                        }
+                        ending_tags = {'EP', 'EF', 'EC', 'ETN', 'ETM'}
+
+                        is_noun_target = (p_key in ['N', 'NB', 'NP', 'NR'])
+                        
+                        if is_noun_target:
+                            # A. 기능소 + 기능소 -> 명사 금지
+                            if (tag in func_tags and next_tag in func_tags):
+                                continue
+                            
+                            # B. 용언(V) + 어미(E) -> 명사 금지
+                            # 용언 어간 뒤에 어미가 왔는데 명사가 되었다? -> 동음이의어(하자, 얼음 등)일 확률 높음
+                            is_pred_inflection = (tag in predicate_tags and next_tag in ending_tags)
+                            if is_pred_inflection:
+                                continue
+
                         # [FIX] word_map과 grammar_map 모두 조회
                         # '어지다' 같은 문법적 표현이나 동사는 grammar_map에 'V' 키로 있을 수 있음
                         candidates = []
