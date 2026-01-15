@@ -78,9 +78,9 @@ class GradeProfiler:
             form_clean = self.data.clean_key(form)
             
             # 0. 표현 패턴 매칭
-            idiom_matched = False
-            if form_clean in self.data.idiom_map:
-                candidates = self.data.idiom_map[form_clean]
+            expression_matched = False
+            if form_clean in self.data.expression_map:
+                candidates = self.data.expression_map[form_clean]
                 for cand in candidates:
                     seq = cand['sequence']
                     if i + len(seq) >= len(tokens): continue
@@ -114,8 +114,8 @@ class GradeProfiler:
                             "offset_start": t_start, "offset_len": full_len
                         })
                         i += (1 + len(seq))
-                        idiom_matched = True; break
-            if idiom_matched: continue
+                        expression_matched = True; break
+            if expression_matched: continue
 
             # [VCP 절대 우선]
             if tag.startswith('VCP'):

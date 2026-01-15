@@ -21,7 +21,7 @@ class GradeDatabase:
         self.grammar_df = None
         self.word_map = {}
         self.grammar_map = {}
-        self.idiom_map = {}
+        self.expression_map = {}
         self.ida_entry = None
         self.morph_service = None  # Dependency injection later or manual init? 
                                    # Ideally passed or accessed. 
@@ -136,7 +136,7 @@ class GradeDatabase:
 
         # 2. 문법/표현 지도
         self.grammar_map = {}
-        self.idiom_map = {} 
+        self.expression_map = {} 
 
         def get_grammar_pos_keys(class_str):
             keys = []
@@ -157,7 +157,7 @@ class GradeDatabase:
             if not any(d['uid'] == entry['uid'] for d in self.grammar_map[key]):
                 self.grammar_map[key].append(entry)
 
-        def register_idiom(raw_pattern, data_dict):
+        def register_expression(raw_pattern, data_dict):
             clean_pat_str = raw_pattern.replace('-', '').replace('~', '').replace('(으)', '').strip()
             if not clean_pat_str: return
             pattern_chunks = clean_pat_str.split()
@@ -177,23 +177,23 @@ class GradeDatabase:
                 if len(valid_tokens) >= 2:
                     start_key = valid_tokens[0]
                     rest_seq = valid_tokens[1:]
-                    if start_key not in self.idiom_map: self.idiom_map[start_key] = []
+                    if start_key not in self.expression_map: self.expression_map[start_key] = []
                     exists = False
-                    for existing in self.idiom_map[start_key]:
+                    for existing in self.expression_map[start_key]:
                         if existing['sequence'] == rest_seq and existing['data']['uid'] == data_dict['uid']:
                             exists = True; break
                     if not exists:
                         entry = data_dict.copy()
                         entry['is_main'] = True
-                        self.idiom_map[start_key].append({'sequence': rest_seq, 'data': entry, 'full_text': raw_pattern})
+                        self.expression_map[start_key].append({'sequence': rest_seq, 'data': entry, 'full_text': raw_pattern})
             except Exception as e: 
-                # print(f"Idiom parsing error: {e}")
+                # print(f"Expression parsing error: {e}")
                 pass
 
         for _, row in self.grammar_df.fillna('').iterrows():
             data = {'level': row['등급'], 'uid': row['전체 번호'], 'desc': row.get('길잡이말', ''), 'meaning': row.get('의미', ''), 'class': str(row['분류'])}
             main_form = str(row['대표형']).strip()
-            if ' ' in main_form or '표현' in data['class']: register_idiom(main_form, data)
+            if ' ' in main_form or '표현' in data['class']: register_expression(main_form, data)
             
             class_str = str(row['분류'])
             pos_keys = get_grammar_pos_keys(class_str)
@@ -204,13 +204,13 @@ class GradeDatabase:
                 for pk in pos_keys: register_grammar((cleaned_main, pk), data, is_main=True)
             
             for rel_form in row['search_related']:
-                if ' ' in rel_form or '표현' in data['class']: register_idiom(rel_form, data)
+                if ' ' in rel_form or '표현' in data['class']: register_expression(rel_form, data)
                 cleaned_rel = self.clean_key(rel_form)
                 if cleaned_rel:
                     for pk in pos_keys: register_grammar((cleaned_rel, pk), data, is_main=False)
 
-        for k in self.idiom_map:
-            self.idiom_map[k].sort(key=lambda x: len(x['sequence']), reverse=True)
+        for k in self.expression_map:
+            self.expression_map[k].sort(key=lambda x: len(x['sequence']), reverse=True)
 
     def search_keyword(self, query, search_type):
         if not query or not self.is_ready: return []
