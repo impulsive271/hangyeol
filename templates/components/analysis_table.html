@@ -22,9 +22,10 @@
                 <th scope="col" style="width: 15%;">표제어</th>
                 <th scope="col" style="width: 20%;">품사</th>
                 <th scope="col" style="width: 10%;">등급</th>
+                <th scope="col" style="width: 12%;">번호</th>
                 <th scope="col">길잡이말</th>
                 <!-- <th scope="col" style="width: 60px; text-align: center;">수정</th> --> <!-- Old Edit -->
-                <th scope="col" style="width: 60px; text-align: center;">수정</th> <!-- New Edit Checkbox -->
+                <th scope="col" style="width: 80px; text-align: center;">수정</th> <!-- New Edit Checkbox -->
             </tr>
         </thead>
         <tbody>
@@ -51,6 +52,9 @@
                     {% else %}
                     <span style="color: var(--color-text-muted);">-</span>
                     {% endif %}
+                </td>
+                <td class="cell-id" style="font-size: 0.85rem; color: var(--color-text-muted);">
+                    {{ row.id }}
                 </td>
                 <td class="cell-desc" style="color: var(--color-secondary);">
                     {{ row.desc }}
@@ -154,8 +158,9 @@
                         <th style="padding: 6px 8px;">표제어</th>
                         <th style="padding: 6px 8px;">품사</th>
                         <th style="padding: 6px 8px;">등급</th>
+                        <th style="padding: 6px 8px;">번호</th>
                         <th style="padding: 6px 8px;">길잡이말</th>
-                        <th style="padding: 6px 12px; text-align: center; min-width: 60px;">수정</th>
+                        <th style="padding: 6px 12px; text-align: center; min-width: 80px;">수정</th>
                     </tr>
                 </thead>
                 <tbody id="selection-edit-tbody">
@@ -688,6 +693,7 @@
             const form = row.querySelector('.cell-form').innerHTML;
             const pos = row.querySelector('.cell-pos').innerHTML;
             const grade = row.querySelector('.cell-grade').innerHTML;
+            const id = row.querySelector('.cell-id').innerText;
             const desc = row.querySelector('.cell-desc').innerText;
             const originalUiId = row.dataset.uiId;
             const offset = row.dataset.offset;
@@ -705,6 +711,7 @@
         <td class="modal-cell-form" style="padding:6px 8px; font-weight:bold;">${form}</td>
         <td class="modal-cell-pos" style="padding:6px 8px;">${pos}</td>
         <td class="modal-cell-grade" style="padding:6px 8px;">${grade}</td>
+        <td class="modal-cell-id" style="padding:6px 8px; font-size:0.85rem; color:#888;">${id}</td>
         <td class="modal-cell-desc" style="padding:6px 8px; color:var(--color-secondary);">${desc}</td>
         <td style="padding:6px 12px; text-align:center;">
             <button class="btn-edit-row" style="opacity:1;" onclick="triggerEditFromModal('${originalUiId}')">✏️</button>
@@ -722,7 +729,7 @@
                     const mergeRow = document.createElement('tr');
                     mergeRow.className = 'merge-button-row';
                     mergeRow.innerHTML = `
-        <td colspan="6" style="padding: 2px; text-align: center; background: transparent; border: none;">
+        <td colspan="7" style="padding: 2px; text-align: center; background: transparent; border: none;">
             <button class="merge-btn" onclick="mergeModalRows('${originalUiId}', '${nextRow.dataset.uiId}')"
                 title="합치기">
                 <span style="font-size: 1.2em;">+</span>
