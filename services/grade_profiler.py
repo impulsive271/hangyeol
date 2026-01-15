@@ -297,6 +297,9 @@ class GradeProfiler:
             i += 1
             
         # AI 결과 반영 (동음이의어 분석)
+        if ambiguous_items and not client:
+             self.debug_lines.append("⚠️ API Key 미설정: AI 동음이의어 분석을 건너뛰고 기본값(첫 번째 후보)을 사용합니다.")
+
         if ambiguous_items and client:
             self.debug_lines.append(f"🤖 AI 동음이의어 분석 시작 ({len(ambiguous_items)}건)...")
             ai_decisions, raw_log = self._disambiguate_with_ai(client, model_name, sentence, ambiguous_items)

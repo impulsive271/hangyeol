@@ -595,6 +595,13 @@
             };
         });
 
+        // [MODIFIED] Calculate max total for exact axis scaling
+        let maxTotal = 0;
+        fileStats.forEach(item => {
+            const sum = gradeKeys.reduce((acc, key) => acc + (item.stats[key] || 0), 0);
+            if (sum > maxTotal) maxTotal = sum;
+        });
+
         absoluteChartInstance = Highcharts.chart('fileAbsoluteChart', {
             chart: {
                 type: 'bar', // 가로 막대 그래프
@@ -617,7 +624,9 @@
             },
             yAxis: {
                 min: 0,
-                // 절대빈도이므로 max 100 아님
+                max: maxTotal, // [MODIFIED] Max set to exact count
+                endOnTick: false,
+                maxPadding: 0,
                 title: {
                     text: '단어 수 (개)',
                     align: 'high',
