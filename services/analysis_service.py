@@ -1,6 +1,6 @@
 import re
 import json
-import google.generativeai as genai
+from google import genai
 from config import Config
 from services.morph_service import MorphService
 from services.grade_database import GradeDatabase
@@ -11,18 +11,15 @@ class AnalysisService:
         self.morph = MorphService()
         self.data = GradeDatabase()
         self.profiler = GradeProfiler(self.data)
-        self.model = None
+        self.client = None
+        self.model_name = "models/gemini-2.0-flash-lite-preview-02-05"
         self._init_ai()
     
     def _init_ai(self):
         api_key = Config.GOOGLE_API_KEY
         if api_key:
             try:
-                genai.configure(api_key=api_key)
-                self.model = genai.GenerativeModel(
-                    "models/gemini-2.0-flash-lite-preview-02-05",
-                    generation_config={"response_mime_type": "application/json"}
-                )
+                self.client = genai.Client(api_key=api_key)
             except Exception as e:
                 print(f"⚠️ AnalysisService AI Init Failed: {e}")
 
@@ -36,7 +33,12 @@ class AnalysisService:
         except Exception as e: return "분석 에러", [], f"Kiwi 분석 오류: {str(e)}"
 
         # Delegate to GradeProfiler
-        analysis_data, max_level, debug_log = self.profiler.profile(tokens, sentence, self.model)
+        analysis_data, max_level, debug_log = self.profiler.profile(
+            tokens, 
+            sentence, 
+            client=self.client,
+            model_name=self.model_name
+        )
 
         # [MODIFIED] 단순 등급 산정 대신 빈도수 집계
         grade_stats = {f"{i}급": 0 for i in range(1, 7)}
