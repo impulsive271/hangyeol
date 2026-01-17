@@ -138,136 +138,151 @@ class GradeProfiler:
                 next_form = next_token.form if hasattr(next_token, 'form') else next_token['form']
                 next_tag = next_token.tag if hasattr(next_token, 'tag') else next_token['tag']
 
-                combined_form = form_clean + self.data.clean_key(next_form)
-                
-                # 병합 시도: (합친단어, 'N') 또는 (합친단어, 'V') 등으로 데이터 조회
-                # 우선순위: 명사(N) -> 동사(V) -> 기타
-                merge_found = False
-                matched_candidate = None
-                matched_pos_type = ''
-
-                # [전략] 합친 형태가 데이터베이스 'N'(명사) 혹은 'V'(동사) 등에 존재하는지 확인
-                # 예: 선생(NNG) + 님(XSN) -> 선생님(N) 존재 확인
-                pos_priorities = ['N', 'NB', 'V', 'M', 'MA', 'I']
-                
-                for p_key in pos_priorities:
-                    # 1. 원형 (그대로) 검색
-                    lookup_keys = [combined_form]
+                # [NEW Rule] 조사(J)가 포함되면 무조건 합치지 않음 (앞 단어든 뒷 단어든)
+                if tag.startswith('J') or next_tag.startswith('J'):
+                    # 단, 특수 케이스: '이다'(VCP) 관련은 위에서 처리되므로 여기선 순수 조사만 거른다고 가정
+                    # 만약 조사와 결합된 단어를 찾아야 하는 예외가 있다면 여기에 예외 규칙 추가 필요.
                     
-                    # 2. 동사/표현 등인 경우 '다' 붙여서 검색 (어지 -> 어지다)
-                    if p_key in ['V', 'ETC']: 
-                         if not combined_form.endswith('다'):
-                             lookup_keys.append(combined_form + '다')
+                    # [CORRECTION] i += 1을 제거함. (단일 토큰 처리로 넘김)
+                    # 따라서 그냥 아래 로직 진행하지 말고 다음 '단일 토큰 처리' 섹션으로 넘어가야 함.
+                    
+                    # 로직 구조상 여기서 continue하면 while 루프의 처음으로 돌아가버림 (i 증가 없이) -> 무한루프 위험
+                    # 목표: "이 2-gram 병합 시도 블록"을 탈출하고 "단일 토큰 처리"로 가야 함.
+                    
+                    # [CORRECTION] i += 1을 하면 현재 토큰(저)을 건너뛰고 다음 토큰(가)부터 분석하게 됨 -> '저'가 누락됨.
+                    # 따라서 그냥 pass만 하면, 병합 로직(else 블록)을 건너뛰고 자연스럽게 아래의 '2. 단일 토큰 처리'로 내려감.
+                    pass 
+                else:
+                    combined_form = form_clean + self.data.clean_key(next_form)
+                    
+                    # 병합 시도: (합친단어, 'N') 또는 (합친단어, 'V') 등으로 데이터 조회
+                    # 우선순위: 명사(N) -> 동사(V) -> 기타
+                    merge_found = False
+                    matched_candidate = None
+                    matched_pos_type = ''
 
-                    for key_var in lookup_keys:
-
-                        # [FIX logic] 
-                        # 1. 기능소+기능소 -> 명사 차단 (기존 로직 유지/보완)
-                        # 2. 용언(V)+어미(E) -> 명사 차단 (오인식 방지 강화)
-                        #    예: 하(VV) + 자(EF) -> 하자(N) (차단)
-                        #    예: 얼(VV) + 음(ETN) -> 얼음(N) (차단: 문맥상 동명사형일 수 있음)
+                    # [전략] 합친 형태가 데이터베이스 'N'(명사) 혹은 'V'(동사) 등에 존재하는지 확인
+                    # 예: 선생(NNG) + 님(XSN) -> 선생님(N) 존재 확인
+                    pos_priorities = ['N', 'NB', 'V', 'M', 'MA', 'I']
+                    
+                    for p_key in pos_priorities:
+                        # 1. 원형 (그대로) 검색
+                        lookup_keys = [combined_form]
                         
-                        func_tags = {
-                            'XSN', 'XSV', 'XSA', 'XSA-I', 'XSV-I', 
-                            'EP', 'EF', 'EC', 'ETN', 'ETM', 
-                            'JKS', 'JKC', 'JKG', 'JKO', 'JKB', 'JKV', 'JKQ', 'JX', 'JC'
-                        }
-                        predicate_tags = {
-                            'VV', 'VA', 'VX', 'VCP', 'VCN', 'VV-I', 'VA-I', 'VX-I', 'VV-R', 'VA-R'
-                        }
-                        ending_tags = {'EP', 'EF', 'EC', 'ETN', 'ETM'}
+                        # 2. 동사/표현 등인 경우 '다' 붙여서 검색 (어지 -> 어지다)
+                        if p_key in ['V', 'ETC']: 
+                             if not combined_form.endswith('다'):
+                                 lookup_keys.append(combined_form + '다')
 
-                        is_noun_target = (p_key in ['N', 'NB', 'NP', 'NR'])
-                        
-                        if is_noun_target:
-                            # A. 기능소 + 기능소 -> 명사 금지
-                            if (tag in func_tags and next_tag in func_tags):
-                                continue
+                        for key_var in lookup_keys:
+
+                            # [FIX logic] 
+                            # 1. 기능소+기능소 -> 명사 차단 (기존 로직 유지/보완)
+                            # 2. 용언(V)+어미(E) -> 명사 차단 (오인식 방지 강화)
+                            #    예: 하(VV) + 자(EF) -> 하자(N) (차단)
+                            #    예: 얼(VV) + 음(ETN) -> 얼음(N) (차단: 문맥상 동명사형일 수 있음)
                             
-                            # B. 용언(V) + 어미(E) -> 명사 금지
-                            # 용언 어간 뒤에 어미가 왔는데 명사가 되었다? -> 동음이의어(하자, 얼음 등)일 확률 높음
-                            is_pred_inflection = (tag in predicate_tags and next_tag in ending_tags)
-                            if is_pred_inflection:
-                                continue
+                            func_tags = {
+                                'XSN', 'XSV', 'XSA', 'XSA-I', 'XSV-I', 
+                                'EP', 'EF', 'EC', 'ETN', 'ETM', 
+                                'JKS', 'JKC', 'JKG', 'JKO', 'JKB', 'JKV', 'JKQ', 'JX', 'JC'
+                            }
+                            predicate_tags = {
+                                'VV', 'VA', 'VX', 'VCP', 'VCN', 'VV-I', 'VA-I', 'VX-I', 'VV-R', 'VA-R'
+                            }
+                            ending_tags = {'EP', 'EF', 'EC', 'ETN', 'ETM'}
 
-                        # [FIX] word_map과 grammar_map 모두 조회
-                        # '어지다' 같은 문법적 표현이나 동사는 grammar_map에 'V' 키로 있을 수 있음
-                        candidates = []
-                        if (key_var, p_key) in self.data.word_map:
-                            candidates.extend(self.data.word_map[(key_var, p_key)])
-                        if (key_var, p_key) in self.data.grammar_map:
-                            candidates.extend(self.data.grammar_map[(key_var, p_key)])
+                            is_noun_target = (p_key in ['N', 'NB', 'NP', 'NR'])
+                            
+                            if is_noun_target:
+                                # A. 기능소 + 기능소 -> 명사 금지
+                                if (tag in func_tags and next_tag in func_tags):
+                                    continue
+                                
+                                # B. 용언(V) + 어미(E) -> 명사 금지
+                                # 용언 어간 뒤에 어미가 왔는데 명사가 되었다? -> 동음이의어(하자, 얼음 등)일 확률 높음
+                                is_pred_inflection = (tag in predicate_tags and next_tag in ending_tags)
+                                if is_pred_inflection:
+                                    continue
 
-                        main_cands = [c for c in candidates if c.get('is_main', False)]
-                        if main_cands: candidates = main_cands
+                            # [FIX] word_map과 grammar_map 모두 조회
+                            # '어지다' 같은 문법적 표현이나 동사는 grammar_map에 'V' 키로 있을 수 있음
+                            candidates = []
+                            if (key_var, p_key) in self.data.word_map:
+                                candidates.extend(self.data.word_map[(key_var, p_key)])
+                            if (key_var, p_key) in self.data.grammar_map:
+                                candidates.extend(self.data.grammar_map[(key_var, p_key)])
+
+                            main_cands = [c for c in candidates if c.get('is_main', False)]
+                            if main_cands: candidates = main_cands
+                            
+                            if candidates:
+                                    # 병합 성공
+                                    matched_candidate = candidates[0]
+                                    matched_pos_type = p_key
+                                    
+                                    # 만약 '다'를 붙여서 찾았다면, 형태도 그에 맞추거나 메모
+                                    # 여기서는 combined_form 자체는 합친 텍스트 그대로 두고,
+                                    # desc나 id는 찾은 '어지다'의 것을 사용함.
+                                    
+                                    if len(candidates) > 1:
+                                        ambiguous_items.append({
+                                            'index': len(analysis_data), 
+                                            'word': key_var, 
+                                            'candidates': candidates
+                                        })
+                                    merge_found = True
+                                    break
+                        if merge_found: break
+                    
+                    # '하다' 파생 용언의 경우 추가 처리 (어근 병합 로직 유지)
+                    if not merge_found:
+                        is_root_merge = (tag == 'XR' and next_tag in ['XSA', 'XSV', 'XSA-I', 'XSV-I'])
+                        if is_root_merge:
+                             combined_form_v = combined_form + '다'
+                             if (combined_form_v, 'V') in self.data.word_map:
+                                 candidates = self.data.word_map[(combined_form_v, 'V')]
+                                 if candidates:
+                                     matched_candidate = candidates[0]
+                                     matched_pos_type = 'V'
+                                     combined_form = combined_form_v # 폼 업데이트
+                                     merge_found = True
+
+                    if merge_found and matched_candidate:
+                        level_str = matched_candidate['level']
+                        self.debug_lines.append(f"🔄 2-gram 병합 성공: {form}+{next_form} -> {combined_form} ({matched_pos_type}) -> {level_str}")
                         
-                        if candidates:
-                                # 병합 성공
-                                matched_candidate = candidates[0]
-                                matched_pos_type = p_key
-                                
-                                # 만약 '다'를 붙여서 찾았다면, 형태도 그에 맞추거나 메모
-                                # 여기서는 combined_form 자체는 합친 텍스트 그대로 두고,
-                                # desc나 id는 찾은 '어지다'의 것을 사용함.
-                                
-                                if len(candidates) > 1:
-                                    ambiguous_items.append({
-                                        'index': len(analysis_data), 
-                                        'word': key_var, 
-                                        'candidates': candidates
-                                    })
-                                merge_found = True
-                                break
-                    if merge_found: break
-                
-                # '하다' 파생 용언의 경우 추가 처리 (어근 병합 로직 유지)
-                if not merge_found:
-                    is_root_merge = (tag == 'XR' and next_tag in ['XSA', 'XSV', 'XSA-I', 'XSV-I'])
-                    if is_root_merge:
-                         combined_form_v = combined_form + '다'
-                         if (combined_form_v, 'V') in self.data.word_map:
-                             candidates = self.data.word_map[(combined_form_v, 'V')]
-                             if candidates:
-                                 matched_candidate = candidates[0]
-                                 matched_pos_type = 'V'
-                                 combined_form = combined_form_v # 폼 업데이트
-                                 merge_found = True
+                        if level_str:
+                            try: max_level = max(max_level, int(re.sub(r'[^0-9]', '', str(level_str))))
+                            except: pass
+                        
+                        # 길이 계산
+                        next_len = getattr(next_token, 'len', 0)
+                        next_start = getattr(next_token, 'start', 0)
+                        calc_len = (next_start + next_len) - t_start if next_start > 0 else 0
 
-                if merge_found and matched_candidate:
-                    level_str = matched_candidate['level']
-                    self.debug_lines.append(f"🔄 2-gram 병합 성공: {form}+{next_form} -> {combined_form} ({matched_pos_type}) -> {level_str}")
-                    
-                    if level_str:
-                        try: max_level = max(max_level, int(re.sub(r'[^0-9]', '', str(level_str))))
-                        except: pass
-                    
-                    # 길이 계산
-                    next_len = getattr(next_token, 'len', 0)
-                    next_start = getattr(next_token, 'start', 0)
-                    calc_len = (next_start + next_len) - t_start if next_start > 0 else 0
+                        # [NEW] 품사 명칭 동적 결정
+                        pos_label = "복합어/파생어"
+                        if 'class' in matched_candidate:
+                            # 문법 DB 유래
+                            cls_val = matched_candidate['class']
+                            if '표현' in cls_val: pos_label = "문법적 표현"
+                            else: pos_label = cls_val
+                        elif 'raw_pos' in matched_candidate:
+                            # 단어 DB 유래
+                            pos_label = matched_candidate['raw_pos']
 
-                    # [NEW] 품사 명칭 동적 결정
-                    pos_label = "복합어/파생어"
-                    if 'class' in matched_candidate:
-                        # 문법 DB 유래
-                        cls_val = matched_candidate['class']
-                        if '표현' in cls_val: pos_label = "문법적 표현"
-                        else: pos_label = cls_val
-                    elif 'raw_pos' in matched_candidate:
-                        # 단어 DB 유래
-                        pos_label = matched_candidate['raw_pos']
-
-                    analysis_data.append({
-                        "form": combined_form,
-                        "tag_code": f"{tag}+{next_tag}",
-                        "tag_name": pos_label,
-                        "level": level_str,
-                        "id": f"단어#{matched_candidate['uid']}",
-                        "desc": matched_candidate['desc'],
-                        "offset_start": t_start,
-                        "offset_len": calc_len
-                    })
-                    i += 2; continue
+                        analysis_data.append({
+                            "form": combined_form,
+                            "tag_code": f"{tag}+{next_tag}",
+                            "tag_name": pos_label,
+                            "level": level_str,
+                            "id": f"단어#{matched_candidate['uid']}",
+                            "desc": matched_candidate['desc'],
+                            "offset_start": t_start,
+                            "offset_len": calc_len
+                        })
+                        i += 2; continue
 
             # 2. 단일 토큰 처리
             source_type = ""; search_key = ""; candidates = []
