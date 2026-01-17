@@ -27,7 +27,7 @@ def analyze_sentence_for_quiz():
 @api_bp.route('/generate_quiz_action', methods=['POST'])
 def generate_quiz_action():
     data = request.json
-    max_grade = max([int(g) for g in data.get('grades', [])] or [1])
+    max_grade = max([int(g) for g in data.get('grades', [])] or [3])
     quiz_type = data.get('quiz_type', 'binary')
     target = data.get('target', '') 
     context = data.get('context', '')

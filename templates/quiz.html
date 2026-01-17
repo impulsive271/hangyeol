@@ -7,9 +7,8 @@
   <form onsubmit="return false;" class="form mt-4">
 
     <fieldset>
-      <legend>1. 기본 설정</legend>
+      <legend>1. 문제 유형 설정</legend>
 
-      <label>문제 유형</label>
       <div class="grid mb-4" style="grid-template-columns: 1fr 1fr;">
         <label class="radio-card">
           <input type="radio" name="quiz_type" value="binary" checked onchange="toggleInputSection()">
@@ -24,15 +23,7 @@
         </label>
       </div>
 
-      <label>목표 등급</label>
-      <div class="grade-grid mb-2">
-        <label><input type="checkbox" name="grades" value="1" checked> 1급</label>
-        <label><input type="checkbox" name="grades" value="2"> 2급</label>
-        <label><input type="checkbox" name="grades" value="3"> 3급</label>
-        <label><input type="checkbox" name="grades" value="4"> 4급</label>
-        <label><input type="checkbox" name="grades" value="5"> 5급</label>
-        <label><input type="checkbox" name="grades" value="6"> 6급</label>
-      </div>
+
     </fieldset>
 
     <fieldset id="section-common-target" style="overflow: visible; z-index: 10;">
@@ -55,19 +46,21 @@
         <div class="input-group">
           <textarea id="sentence-input" rows="2" placeholder="예: 나는 한국 음식이 좋아요"></textarea>
           <button type="button" class="secondary" onclick="analyzeSentence()"
-            style="width: auto; margin-bottom: 0;">분석</button>
+            style="width: auto; margin-bottom: 0; align-self: center; padding: 8px 16px; font-size: 0.9rem; height: auto;">분석</button>
         </div>
-        <div id="morpheme-area" class="morpheme-container mt-3" style="display: none;">
+        <div id="morpheme-area" class="morpheme-container mt-3"
+          style="display: none; padding: 15px; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px dashed #555;">
           <div id="morpheme-chips" class="chip-wrapper"></div>
         </div>
       </div>
 
-      <div class="selected-target-display mt-4">
-        <span>선택됨:</span>
-        <strong id="display-target" class="gradient-text">없음</strong>
-        <input type="hidden" id="final-target-value">
-        <input type="hidden" id="final-context-value">
+      <div id="quiz-tag-wrapper" style="display: flex; align-items: center; margin-top: 15px; min-height: 30px;">
+        <span id="quiz-tag-label"
+          style="margin-right: 8px; font-weight: bold; font-size: 0.9rem; color: #bbb; display: none;">선택됨:</span>
+        <div id="quiz-tag-container" class="tags-area" style="margin: 0;"></div>
       </div>
+      <input type="hidden" id="final-target-value">
+      <input type="hidden" id="final-context-value">
     </fieldset>
 
     <fieldset id="section-matching-target" style="display: none;">
@@ -183,19 +176,7 @@
     gap: 10px;
   }
 
-  .grade-grid label {
-    display: flex;
-    align-items: center;
-    background: rgba(255, 255, 255, 0.05);
-    padding: 8px 16px;
-    border-radius: 20px;
-    border: 1px solid #444;
-    cursor: pointer;
-  }
 
-  .grade-grid input {
-    margin-right: 8px;
-  }
 
   .radio-card {
     display: flex;
@@ -274,6 +255,67 @@
     background: #ef4444;
     border-color: #ef4444;
   }
+
+  /* Unified Tag Style */
+  .tags-area {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-height: 30px;
+  }
+
+  .keyword-tag {
+    display: inline-flex;
+    align-items: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 3px 10px;
+    /* Minimized padding */
+    border-radius: 20px;
+    font-size: 0.85rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    animation: fadeIn 0.2s ease-out;
+    line-height: 1.1;
+    /* Tighter line height */
+  }
+
+  .tag-grade {
+    font-size: 0.75em;
+    background: rgba(0, 0, 0, 0.25);
+    padding: 1px 5px;
+    /* Tighter padding */
+    border-radius: 4px;
+    margin: 0 6px 0 4px;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+
+  .tag-remove {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 1.1rem;
+    cursor: pointer;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+  }
+
+  .tag-remove:hover {
+    color: #fff;
+  }
+
+  /* Morpheme Chip Glow */
+  .morph-chip.selected {
+    background: var(--brand-gradient);
+    color: white;
+    box-shadow: 0 0 10px rgba(139, 92, 246, 0.6);
+    /* Glow effect */
+    border-color: #a855f7;
+    font-weight: bold;
+    transform: scale(1.05);
+    transition: all 0.2s ease;
+  }
 </style>
 
 <script src="{{ url_for('static', filename='js/matching_quiz.js') }}"></script>
@@ -309,43 +351,161 @@
 
   function resetSelection() {
     document.getElementById('final-target-value').value = '';
-    document.getElementById('display-target').innerText = '없음';
+    document.getElementById('final-context-value').value = '';
     document.getElementById('morpheme-area').style.display = 'none';
+    document.getElementById('quiz-tag-container').innerHTML = '';
+    document.getElementById('quiz-tag-label').style.display = 'none';
+
+    // Reset morpheme selection state
+    currentMorphs = [];
+    selectedMorphIndices = [];
   }
 
-  function selectTarget(display, val, context) {
-    document.getElementById('final-target-value').value = val;
-    document.getElementById('final-context-value').value = context || '';
-    document.getElementById('display-target').innerText = display;
+  // --- Search Mode Logic (Single Tag) ---
+  function addQuizTag(text, grade, hint) {
+    const container = document.getElementById('quiz-tag-container');
+    container.innerHTML = ''; // Single select for Quiz: replace existing
+
+    // UI creation
+    const tag = document.createElement('span');
+    tag.className = 'keyword-tag';
+
+    // For display, we might not show grade if it came from sentence analysis, but search usually has it.
+    let gradeHtml = grade ? `<span class="tag-grade">${grade}</span>` : '';
+
+    tag.innerHTML = `<span class="tag-text">${text}</span>${gradeHtml}<button type="button" class="tag-remove">×</button>`;
+
+    tag.querySelector('.tag-remove').addEventListener('click', () => {
+      resetSelection();
+    });
+
+    container.appendChild(tag);
+    document.getElementById('quiz-tag-label').style.display = 'inline';
+
+    // Update Hidden Input
+    const val = `${text} (${grade || '?'})`; // Keeping original format expectation or simplifying? 
+    // Wait, original logic was: display=`${item.text} [${item.pos}]`, val=`${item.text} (${item.pos})`
+    // Let's adapt. If it comes from search: text=word, grade=pos. 
+
+    // NOTE: The previous logic used 'pos' as 'grade' in 'val'. 
+    // Let's trust the arguments passed.
   }
 
   initSearchModule(function (item) {
-    const display = `${item.text} [${item.pos}]`;
+    // Search result click
+    // item: {text, grade, desc, pos}
     const val = `${item.text} (${item.pos})`;
-    selectTarget(display, val, item.desc);
+
+    // Update Hidden
+    document.getElementById('final-target-value').value = val;
+    document.getElementById('final-context-value').value = item.desc;
+
+    // UI Update
+    addQuizTag(item.text, item.pos, item.desc);
+
     document.getElementById('common-search-results').style.display = 'none';
     document.getElementById('common-search-input').value = '';
   });
 
+  // --- Sentence Mode Logic (Contiguous Highlighting) ---
+  let currentMorphs = []; // Store [{form, tag}, ...]
+  let selectedMorphIndices = []; // Store [0, 1, 2]
+
   async function analyzeSentence() {
     const text = document.getElementById('sentence-input').value;
     if (!text) return alert("문장을 입력하세요.");
+
+    // Reset
+    resetSelection();
+
     const res = await fetch('/analyze_sentence_for_quiz', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sentence: text })
     });
     const data = await res.json();
+
+    currentMorphs = data.morphs;
+    selectedMorphIndices = [];
+
     const box = document.getElementById('morpheme-chips');
     box.innerHTML = '';
     document.getElementById('morpheme-area').style.display = 'block';
-    data.morphs.forEach(m => {
+
+    renderMorphChips();
+  }
+
+  function renderMorphChips() {
+    const box = document.getElementById('morpheme-chips');
+    box.innerHTML = '';
+
+    currentMorphs.forEach((m, idx) => {
       const chip = document.createElement('div');
       chip.className = 'morph-chip';
-      chip.innerText = m.form;
-      chip.onclick = function () {
-        selectTarget(`${m.form} [${m.tag}]`, `${m.form} (${m.tag})`, text);
+      if (selectedMorphIndices.includes(idx)) {
+        chip.classList.add('selected');
       }
+      chip.innerText = m.form; // Simple view
+
+      chip.onclick = () => handleMorphClick(idx);
       box.appendChild(chip);
     });
+  }
+
+  function handleMorphClick(index) {
+    if (selectedMorphIndices.length === 0) {
+      // First selection
+      selectedMorphIndices = [index];
+    } else {
+      // Check adjacency
+      const min = Math.min(...selectedMorphIndices);
+      const max = Math.max(...selectedMorphIndices);
+
+      if (index === min - 1) {
+        // Prepend
+        selectedMorphIndices.unshift(index);
+      } else if (index === max + 1) {
+        // Append
+        selectedMorphIndices.push(index);
+      } else if (selectedMorphIndices.includes(index)) {
+        // Deselecting? Or maybe just reset if clicking inside? 
+        // User asked: "단 연속된 요소가 아니면 선택이 안 되게 해줘." -> Implies strict contiguity.
+        // If clicking non-adjacent, reset and select new.
+        // What if clicking inside existing selection? Let's treat it as reset for simplicity or maybe toggle?
+        // Let's follow "non-adjacent -> reset" logic.
+        // But what if I want to deselect one from the edge? 
+        // Let's keep it simple: Click non-adjacent = Start New Selection.
+
+        // If clicking existing, maybe do nothing or reset to just that one?
+        // Let's reset to just that one to allow 'shrinking' via restart.
+        selectedMorphIndices = [index];
+      } else {
+        // Non-adjacent -> Start new
+        selectedMorphIndices = [index];
+      }
+    }
+
+    selectedMorphIndices.sort((a, b) => a - b);
+    renderMorphChips();
+    updateSentenceSelection();
+  }
+
+  function updateSentenceSelection() {
+    if (selectedMorphIndices.length === 0) return;
+
+    // Construct merged string: 좋+아+요
+    const selectedItems = selectedMorphIndices.map(i => currentMorphs[i]);
+    const mergedText = selectedItems.map(m => m.form).join('+');
+    const mergedTag = selectedItems.map(m => m.tag).join('+'); // Not strictly needed for display but good for backend if needed
+
+    // Update Hidden Input (Target)
+    const val = `${mergedText} (${mergedTag})`;
+    document.getElementById('final-target-value').value = val;
+
+    // Context is the original sentence 
+    document.getElementById('final-context-value').value = document.getElementById('sentence-input').value;
+
+    // Update Visual Tag (Unified UI)
+    // We pass mergedTag as 'grade' slot just to show POS info
+    addQuizTag(mergedText, mergedTag, '');
   }
 
   async function generateQuiz() {
@@ -382,7 +542,8 @@
 
       } else {
         const target = document.getElementById('final-target-value').value;
-        const grades = Array.from(document.querySelectorAll('input[name="grades"]:checked')).map(cb => cb.value);
+        // const grades = Array.from(document.querySelectorAll('input[name="grades"]:checked')).map(cb => cb.value);
+        const grades = ['3']; // Default to 3 directly in frontend or let backend handle it. Sending ['3'] explicitly.
         const userPrompt = document.getElementById('user-prompt').value;
         const context = document.getElementById('final-context-value').value;
 
