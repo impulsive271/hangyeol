@@ -47,7 +47,7 @@ class QuizService:
             
         try:
             response = self.client.models.generate_content(
-                model="models/gemini-2.0-flash-lite-preview-02-05", # Quiz might need smarter model? Stick to existing.
+                model=Config.GEMINI_MODEL_NAME, # Quiz might need smarter model? Stick to existing.
                 contents=prompt,
                 config={"response_mime_type": "application/json"}
             )
@@ -88,7 +88,7 @@ class QuizService:
 
         try:
             response = self.client.models.generate_content(
-                model="models/gemini-2.0-flash-lite-preview-02-05",
+                model=Config.GEMINI_MODEL_NAME,
                 contents=prompt,
                 config={"response_mime_type": "application/json"}
             )

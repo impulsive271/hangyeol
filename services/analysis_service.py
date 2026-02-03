@@ -12,7 +12,7 @@ class AnalysisService:
         self.data = GradeDatabase()
         self.profiler = GradeProfiler(self.data)
         self.client = None
-        self.model_name = "models/gemini-2.0-flash-lite-preview-02-05"
+        self.model_name = Config.GEMINI_MODEL_NAME
         self._init_ai()
     
     def _init_ai(self):
