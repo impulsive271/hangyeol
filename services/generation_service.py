@@ -55,7 +55,7 @@ class GenerationService:
         for attempt in range(max_api_retries):
             try:
                 response = self.client.models.generate_content(
-                    model="models/gemini-2.0-flash-lite-preview-02-05",
+                    model=Config.GEMINI_MODEL_NAME,
                     contents=prompt,
                     config={"response_mime_type": "text/plain"}
                 )

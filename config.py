@@ -10,4 +10,5 @@ if 'GOOGLE_API_KEY' in os.environ and 'GEMINI_API_KEY' in os.environ:
 class Config:
     SECRET_KEY = os.getenv('SECRET_KEY', 'hangyeol_secret_key')
     GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
+    GEMINI_MODEL_NAME = "models/gemini-2.5-flash-lite"
     # Add other configuration variables here if needed
