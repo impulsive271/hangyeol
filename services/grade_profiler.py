@@ -11,21 +11,28 @@ class GradeProfiler:
         if not client or not ambiguous_items: return {}, "AI 미사용"
         
         prompt = f"""
-        당신은 한국어 어휘 분석기입니다. 아래 문맥을 보고 동음이의어 중 가장 적절한 의미를 고르세요.
+        당신은 한국어 어휘 분석 전문가입니다. 주어진 문맥을 바탕으로 동음이의어의 가장 적절한 의미를 판단하세요.
         문맥: "{sentence}"
         
         [분석 대상 목록]
         """
         for i, item in enumerate(ambiguous_items):
-            options_str = ", ".join([f"(ID:{cand['uid']}) {cand['desc']}" for cand in item['candidates']])
-            prompt += f"[{i}] 단어: '{item['word']}' -> 후보: [{options_str}]\n"
+            # 0-Index를 1-Index로 변환하여 표시 (사용자/AI 친화적)
+            idx = i + 1
+            options = []
+            for cand in item['candidates']:
+                desc = cand.get('desc') or cand.get('meaning') or "의미 정보 없음"
+                options.append(f"(ID:{cand['uid']}) {desc}")
+            
+            options_str = ", ".join(options)
+            prompt += f"[{idx}] 단어: '{item['word']}' -> 후보: [{options_str}]\n"
             
         prompt += """
         [출력 규칙]
-        1. 반드시 JSON 형식으로만 응답하세요. (마크다운 없이)
-        2. Key는 위 목록의 [번호]를 사용하세요. (예: "0", "1")
-        3. Value는 선택한 ID 값만 넣으세요.
-        4. 예시: {"0": "272", "1": "677"}
+        1. 오직 JSON 형식으로만 응답하세요. (마크다운 코드 블록 ```json 사용 금지)
+        2. Key는 위 목록의 [번호]를 문자열로 사용하세요. (예: "1", "2")
+        3. Value는 선택한 ID 값(문자열)만 넣으세요.
+        4. 예시: {"1": "272", "2": "677"}
         """
         
         raw_response = ""
@@ -349,13 +356,20 @@ class GradeProfiler:
             ai_decisions, raw_log = self._disambiguate_with_ai(client, model_name, sentence, ambiguous_items)
             
             for i, item in enumerate(ambiguous_items):
-                key_idx = str(i)
+                # Request Key: "1", "2"... (1-based Index)
+                req_idx = str(i + 1)
+                
                 word_key = item['word']
                 target_idx = item['index']
                 selected_uid = None
                 
-                if key_idx in ai_decisions:
-                    selected_uid = str(ai_decisions[key_idx])
+                # Check for 1-based index key first
+                if req_idx in ai_decisions:
+                    selected_uid = str(ai_decisions[req_idx])
+                # Fallback check for 0-based index key (just in case)
+                elif str(i) in ai_decisions:
+                    selected_uid = str(ai_decisions[str(i)])
+                # Fallback: Check by word itself (ambiguous if duplicates exists but better than nothing)
                 elif word_key in ai_decisions:
                     selected_uid = str(ai_decisions[word_key])
                 
