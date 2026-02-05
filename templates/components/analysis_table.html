@@ -24,8 +24,7 @@
                 <th scope="col" style="width: 10%;">등급</th>
                 <th scope="col" style="width: 12%;">번호</th>
                 <th scope="col">길잡이말</th>
-                <!-- <th scope="col" style="width: 60px; text-align: center;">수정</th> --> <!-- Old Edit -->
-                <th scope="col" style="width: 80px; text-align: center;">수정</th> <!-- New Edit Checkbox -->
+                <th scope="col" style="width: 80px; text-align: center;">수정</th> <!-- 수정/선택 체크박스 -->
             </tr>
         </thead>
         <tbody>
@@ -60,10 +59,7 @@
                     {{ row.desc }}
                 </td>
                 <td style="text-align: center;">
-                    <!-- Old Edit Button (Commented Out) -->
-                    <!-- <button class="btn-edit-row" onclick="openEditModal(this)" title="등급 수동 수정">✏️</button> -->
-
-                    <!-- New Edit Checkbox -->
+                    <!-- 행 선택 체크박스 (병합 및 일괄 수정용) -->
                     <input type="checkbox" class="row-selector" onchange="handleRowSelection()">
                 </td>
             </tr>
@@ -84,7 +80,7 @@
             (기존 표제어는 유지되거나 '기존 -> 새단어'로 표시됩니다.)
         </p>
 
-        <!-- [MODIFIED] Unified Search Bar Style -->
+        <!-- 검색창 (단어/문법 선택 가능) -->
         <div class="grid" style="grid-template-columns: 1fr 3fr; gap: 10px; margin-bottom: 1rem;">
             <select id="edit-search-type" style="margin-bottom:0;">
                 <option value="word" selected>단어</option>
@@ -101,7 +97,7 @@
     </article>
 </dialog>
 
-<!-- [NEW] Floating Merge Button -->
+<!-- 병합 버튼 (플로팅) -->
 <div id="floating-merge-btn" style="position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); 
     background-color: var(--color-primary); color: white; padding: 12px 24px; border-radius: 30px; 
     box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 1000; display: none; cursor: pointer; font-weight: bold;
@@ -111,7 +107,7 @@
     선택한 단어 수정하기
 </div>
 
-<!-- [NEW] Merge Modal -->
+<!-- 병합 설정 모달 -->
 <dialog id="merge-modal">
     <article style="min-width: 400px;">
         <header>
@@ -141,7 +137,7 @@
     </article>
 </dialog>
 
-<!-- [NEW] Selection Edit Modal -->
+<!-- 선택한 항목 일괄 수정 모달 -->
 <dialog id="selection-edit-modal">
     <article style="width: 100%; max-width: 1100px; min-width: 500px; padding: 1.5rem;">
         <header style="padding-bottom: 0.5rem;">
@@ -314,9 +310,9 @@
     }
 
 
-    /* [NEW] Row Highlight System using Transitions (Final Fix) */
+    /* 행 하이라이트 시스템 (Transition 활용) */
 
-    /* 1. Base State (Hidden/Transparent) */
+    /* 1. 기본 상태 (숨김/투명) */
     /* We don't need a specific base state class, default is none */
 
     /* 2. Start State: Immediate Appearance */
@@ -353,7 +349,7 @@
         box-shadow: inset -2px 2px 0 transparent, inset 0 -2px 0 transparent !important;
     }
 
-    /* [NEW] Analysis Table Tooltip Style (Copied from Visualization) */
+    /* 분석 테이블 툴팁 스타일 (Visualization과 유사) */
     #pos-tooltip {
         position: fixed;
         background-color: var(--color-text);
@@ -383,7 +379,7 @@
     }
 </style>
 
-<!-- [NEW] Tooltip Element for Analysis Table -->
+<!-- 분석 테이블용 툴팁 요소 -->
 <div id="pos-tooltip"></div>
 
 <script>
@@ -436,8 +432,8 @@
         const modal = document.getElementById('word-edit-modal');
         modal.showModal();
 
-        // [NEW] Auto-Search Implementation
-        // Use provided initialSearchText (merged form) or fallback to original form
+        // 자동 검색 기능:
+        // 초기 검색어가 있으면 사용하고, 없으면 원본 형태를 사용 (병합된 형태 우선)
         const originalForm = initialSearchText || currentEditingRow.dataset.originalForm || currentEditingRow.querySelector('.cell-form').innerText;
         const tagCode = currentEditingRow.dataset.tagCode || ""; // Get tag code
 
@@ -567,7 +563,7 @@
     function applyEdit(item) {
         if (!currentEditingRow) return;
 
-        // [NEW] Text Cleaning Logic
+        // 텍스트 정제 로직 (숫자, 문장부호 제거)
         let cleanText = item.text || item.word || "";
         cleanText = cleanText.replace(/[0-9]+$/, '');
         cleanText = cleanText.replace(/^[-~]+|[-~]+$/g, '');
@@ -605,7 +601,7 @@
         const descText = item.desc || item.meaning;
 
         if (isInsideModal) {
-            // [MODAL CONTEXT] Update Modal Row only
+            // [모달/일괄 수정 모드] 모달 내부의 행만 업데이트
             currentEditingRow.querySelector('.modal-cell-form').innerHTML = formHtml;
             currentEditingRow.querySelector('.modal-cell-pos').innerHTML = posHtml;
             currentEditingRow.querySelector('.modal-cell-grade').innerHTML = gradeHtml;
@@ -622,7 +618,7 @@
             currentEditingRow.dataset.finalDesc = descText;
             currentEditingRow.dataset.finalTagCode = ""; // If available from item?
 
-            // [NEW] Save ID for confirmation
+            // 확인 시 메인 테이블로 전달할 ID 저장
             if (item.uid) {
                 const prefix = item.type === 'grammar' ? '문법' : '단어';
                 currentEditingRow.dataset.finalId = `${prefix}#${item.uid}`;
@@ -630,7 +626,7 @@
                 currentEditingRow.dataset.finalId = "수동교정";
             }
 
-            // [MODAL CONTEXT] Update ID cell immediately
+            // [모달/일괄 수정 모드] 모달 내 ID 셀 즉시 업데이트
             const modalIdCell = currentEditingRow.querySelector('.modal-cell-id');
             if (modalIdCell) modalIdCell.innerText = currentEditingRow.dataset.finalId;
 
@@ -638,7 +634,7 @@
             return; // STOP here. Do not update main table yet.
         }
 
-        // [MAIN TABLE CONTEXT] Update Immediately
+        // [단일 수정] 메인 테이블 즉시 업데이트
         const formCell = currentEditingRow.querySelector('.cell-form');
         formCell.innerHTML = formHtml;
 
@@ -673,7 +669,7 @@
         closeEditModal();
     }
 
-    // [NEW] Selection & Merge Logic
+    // 다중 선택 및 병합 로직
     let selectedRows = [];
 
     function handleRowSelection() {

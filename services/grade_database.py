@@ -176,8 +176,8 @@ class GradeDatabase:
                             continue
                         
                         form_val = self.clean_key(t.form)
-                        # [FIX] '보다'가 조사(JKB) 등으로 오분석되거나 통째로 인식될 경우, 
-                        # 표현 매칭('어+보')을 위해 '보'로 강제 변환
+                        # '보다'가 조사(JKB) 등으로 오분석되거나 통째로 인식될 경우를 대비하여
+                        # 표현 매칭('어+보')을 위해 '보'로 강제 변환합니다.
                         if form_val == '보다':
                             form_val = '보'
 

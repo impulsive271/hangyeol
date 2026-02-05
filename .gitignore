@@ -1,3 +1,31 @@
 venv
 __pycache__
 .env
+*.pyc
+*.pyo
+*.pyd
+
+# Just in case for OS
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
+
+# Logs and Debug
+*.log
+debug_*.txt
+output.txt
+error_trace.txt
+
+# Build artifacts
+dist/
+build/
+*.spec
+
+# Temp files
+reproduce_*.py
+install_log.txt
+installed.txt
+tmp/
+temp/
