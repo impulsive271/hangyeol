@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, send_file
+from flask import Blueprint, render_template, request, send_file, jsonify
 from services.analysis_service import AnalysisService
 from services.generation_service import GenerationService
 from services.visualization_service import VisualizationService
@@ -55,7 +55,7 @@ def grade_upload():
         # 파일이 없으면 텍스트 분석 시도 (Fallback)
         if request.form.get('sentence', '').strip():
             return grade()
-        return "파일이 없거나 텍스트 내용이 없습니다.", 400
+        return jsonify({"error": "파일이 없거나 텍스트 내용이 없습니다."}), 400
     
     file_stats_list = []
     combined_analysis_result = []
@@ -117,7 +117,7 @@ def grade_upload():
                        file_text_contents=file_text_contents)  # [NEW] 전달
 
     except Exception as e:
-        return f"파일 처리 중 오류 발생: {e}", 500
+        return jsonify({"error": f"파일 처리 중 오류 발생: {e}"}), 500
 
 @main_bp.route("/generate", methods=["GET", "POST"])
 def generate():

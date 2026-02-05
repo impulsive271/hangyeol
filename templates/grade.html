@@ -26,7 +26,8 @@
   <details style="margin-top: 1rem; margin-bottom: 2rem;">
     <summary style="font-weight: bold; cursor: pointer;">📂 파일 업로드 (.txt)</summary>
     <div style="padding: 1rem; border: 1px solid var(--muted-border-color); border-radius: 8px; margin-top: 0.5rem;">
-      <form action="{{ url_for('main.grade_upload') }}" method="post" enctype="multipart/form-data" class="grid"
+      <form id="file-upload-form" action="{{ url_for('main.grade_upload') }}" method="post"
+        enctype="multipart/form-data" class="grid"
         style="grid-template-columns: 1fr; gap: 10px; margin-bottom:0; padding:0; border:none; box-shadow:none; background:transparent; backdrop-filter:none; -webkit-backdrop-filter:none;">
 
         <!-- [NEW] Hidden Real Input -->
@@ -205,6 +206,61 @@
     const fileListContainer = document.getElementById('file-list-container');
     const uploadBtn = document.getElementById('upload-btn');
     const dropZone = document.getElementById('drop-zone');
+    const uploadForm = document.getElementById('file-upload-form');
+
+    // [NEW] AJAX Submission Handler
+    uploadForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      // [Check] 파일이 있는지 먼저 확인
+      if (currentFiles.length === 0) {
+        alert("분석할 파일이 없습니다. 파일을 추가해주세요.");
+        return;
+      }
+
+      // [MODIFIED] FormData 수동 구성 (input 동기화 문제 해결)
+      const formData = new FormData();
+      currentFiles.forEach(file => {
+        formData.append('file', file);
+      });
+
+      // Show loading state
+      uploadBtn.disabled = true;
+      uploadBtn.innerText = '⏳ 분석 중...';
+
+      fetch(uploadForm.action, {
+        method: 'POST',
+        body: formData
+      })
+        .then(response => {
+          if (response.ok) {
+            return response.text().then(html => {
+              document.open();
+              document.write(html);
+              document.close();
+
+              // [Safety] 즉시 테마 재적용 (FOUC 방지)
+              const savedTheme = localStorage.getItem('theme') || 'light';
+              document.documentElement.setAttribute('data-theme', savedTheme);
+            });
+          } else {
+            return response.json().then(data => {
+              alert(data.error || "알 수 없는 오류가 발생했습니다.");
+            }).catch(() => {
+              // JSON 파싱 실패 시 HTML 에러 페이지일 수 있음
+              alert("서버 오류가 발생했습니다. (응답을 처리할 수 없습니다)");
+            });
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert("네트워크 오류가 발생했습니다.");
+        })
+        .finally(() => {
+          uploadBtn.disabled = false;
+          uploadBtn.innerText = '📂 파일 분석하기';
+        });
+    });
 
     // Global array to maintain file order
     let currentFiles = [];

@@ -22,7 +22,7 @@
       </div>
     </fieldset>
 
-    <fieldset style="overflow: visible; z-index: 10;">
+    <fieldset style="position: relative; overflow: visible; z-index: 1000;">
       <legend>2. 포함할 단어/문법</legend>
       {% include 'components/search_bar.html' %}
       <div id="selected-tags-container" class="tags-area"></div>
@@ -238,8 +238,9 @@
     left: 0 !important;
     right: 0 !important;
     z-index: 9999 !important;
-    background: #222;
-    border: 1px solid #555;
+    z-index: 9999 !important;
+    background: var(--background-color);
+    border: 1px solid var(--muted-border-color);
     border-radius: 0 0 8px 8px;
     max-height: 250px;
     overflow-y: auto;
@@ -249,14 +250,15 @@
 
   .search-result-item {
     padding: 12px;
-    border-bottom: 1px solid #333;
+    padding: 12px;
+    border-bottom: 1px solid var(--muted-border-color);
     cursor: pointer;
     transition: background 0.1s;
     text-align: left;
   }
 
   .search-result-item:hover {
-    background-color: #3e3e3e;
+    background-color: var(--secondary-bg);
   }
 
   /* [태그 스타일 - 슬림 버전] */

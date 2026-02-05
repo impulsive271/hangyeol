@@ -47,7 +47,8 @@ class GradeDatabase:
             'JKB': '부사격 조사', 'JKV': '호격 조사', 'JKQ': '인용격 조사', 'JX': '보조사', 'JC': '접속 조사',
             'EP': '선어말 어미', 'EF': '종결 어미', 'EC': '연결 어미', 'ETN': '명사형 전성 어미', 'ETM': '관형형 전성 어미',
             'XPN': '체언 접두사', 'XSN': '명사 파생 접미사', 'XSV': '동사 파생 접미사', 'XSA': '형용사 파생 접미사',
-            'XR': '어근', 'SF': '마침표', 'SP': '쉼표', 'SS': '따옴표/괄호', 'SE': '줄임표', 'SO': '붙임표', 'SW': '기타 기호'
+            'XR': '어근', 'SF': '마침표', 'SP': '쉼표', 'SS': '따옴표/괄호', 'SE': '줄임표', 'SO': '붙임표', 'SW': '기타 기호',
+            'SN': '숫자'
         }
         
         self._initialized = True
@@ -173,7 +174,14 @@ class GradeDatabase:
                     for idx, t in enumerate(tokens):
                         if chunk == pattern_chunks[-1] and idx == len(tokens) - 1 and t.form == '다' and t.tag == 'EF':
                             continue
-                        valid_tokens.append(self.clean_key(t.form))
+                        
+                        form_val = self.clean_key(t.form)
+                        # [FIX] '보다'가 조사(JKB) 등으로 오분석되거나 통째로 인식될 경우, 
+                        # 표현 매칭('어+보')을 위해 '보'로 강제 변환
+                        if form_val == '보다':
+                            form_val = '보'
+
+                        valid_tokens.append(form_val)
                 if len(valid_tokens) >= 2:
                     start_key = valid_tokens[0]
                     rest_seq = valid_tokens[1:]
@@ -224,7 +232,7 @@ class GradeDatabase:
                 mask = self.word_df['어휘'].astype(str).apply(normalize).str.contains(norm_query, na=False)
                 df = self.word_df[mask].head(10)
                 for _, row in df.fillna('').iterrows():
-                    results.append({"text": row['어휘'], "grade": row['등급'], "desc": str(row['길잡이말']), "pos": row['품사'], "meaning": ""})
+                    results.append({"text": row['어휘'], "grade": row['등급'], "desc": str(row['길잡이말']), "pos": row['품사'], "meaning": "", "uid": row['전체 번호']})
             else:
                 norm_query = normalize(query)
                 search_candidates = {norm_query}
@@ -250,6 +258,6 @@ class GradeDatabase:
                 final_mask = main_mask | related_mask
                 df = self.grammar_df[final_mask].head(10)
                 for _, row in df.fillna('').iterrows():
-                    results.append({"text": row['대표형'], "grade": row['등급'], "desc": str(row.get('길잡이말', '')), "pos": row['분류'], "related": ", ".join(row['search_related']), "meaning": str(row.get('의미', ''))})
+                    results.append({"text": row['대표형'], "grade": row['등급'], "desc": str(row.get('길잡이말', '')), "pos": row['분류'], "related": ", ".join(row['search_related']), "meaning": str(row.get('의미', '')), "uid": row['전체 번호']})
         except Exception as e: print(f"검색 오류: {e}")
         return results
