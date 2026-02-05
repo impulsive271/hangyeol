@@ -145,22 +145,15 @@ class GradeProfiler:
                 next_form = next_token.form if hasattr(next_token, 'form') else next_token['form']
                 next_tag = next_token.tag if hasattr(next_token, 'tag') else next_token['tag']
 
-                # [NEW Rule] 조사(J)가 포함되면 무조건 합치지 않음 (앞 단어든 뒷 단어든)
+                # [NEW Rule] 조사(J)가 포함되면 무조건 합치지 않음
                 if tag.startswith('J') or next_tag.startswith('J'):
-                    # 단, 특수 케이스: '이다'(VCP) 관련은 위에서 처리되므로 여기선 순수 조사만 거른다고 가정
-                    # 만약 조사와 결합된 단어를 찾아야 하는 예외가 있다면 여기에 예외 규칙 추가 필요.
-                    
-                    # [CORRECTION] i += 1을 제거함. (단일 토큰 처리로 넘김)
-                    # 따라서 그냥 아래 로직 진행하지 말고 다음 '단일 토큰 처리' 섹션으로 넘어가야 함.
-                    
-                    # 로직 구조상 여기서 continue하면 while 루프의 처음으로 돌아가버림 (i 증가 없이) -> 무한루프 위험
-                    # 목표: "이 2-gram 병합 시도 블록"을 탈출하고 "단일 토큰 처리"로 가야 함.
-                    
-                    # [CORRECTION] i += 1을 하면 현재 토큰(저)을 건너뛰고 다음 토큰(가)부터 분석하게 됨 -> '저'가 누락됨.
-                    # 따라서 그냥 pass만 하면, 병합 로직(else 블록)을 건너뛰고 자연스럽게 아래의 '2. 단일 토큰 처리'로 내려감.
                     pass 
+                # [NEW Rule] 숫자/기호(clean_key가 빈 문자열)가 포함되면 병합하지 않음
+                elif not form_clean or not self.data.clean_key(next_form):
+                    pass
                 else:
                     combined_form = form_clean + self.data.clean_key(next_form)
+                    raw_combined_form = form + next_form # 시각화용 원본 보존
                     
                     # 병합 시도: (합친단어, 'N') 또는 (합친단어, 'V') 등으로 데이터 조회
                     # 우선순위: 명사(N) -> 동사(V) -> 기타
@@ -252,7 +245,12 @@ class GradeProfiler:
                                  if candidates:
                                      matched_candidate = candidates[0]
                                      matched_pos_type = 'V'
-                                     combined_form = combined_form_v # 폼 업데이트
+                                     combined_form = combined_form_v # 폼 업데이트 (검색용 키)
+                                     # [FIX] 시각화용 원본은 '하다/되다' 등이 붙은 형태가 아니라 결합된 그대로여야 할 수도 있고, 
+                                     # 맥락상 '건강+하다'가 합쳐진 것이므로 raw_combined_form을 그대로 써도 됨.
+                                     # 단, combined_form이 '건강다'(X)가 아니라 '건강하다'(O)가 되도록 로직이 필요할 수 있으나,
+                                     # 여기서는 검색 성공 시 combined_form을 '건강하다'로 바꿨으므로(위 코드), 
+                                     # 시각화에는 2토큰의 원본 결합(raw_combined_form)을 쓰는 게 안전함.
                                      merge_found = True
 
                     if merge_found and matched_candidate:
@@ -280,7 +278,7 @@ class GradeProfiler:
                             pos_label = matched_candidate['raw_pos']
 
                         analysis_data.append({
-                            "form": combined_form,
+                            "form": raw_combined_form, # [FIX] 시각화엔 원본 형태 사용 (숫자 보존)
                             "tag_code": f"{tag}+{next_tag}",
                             "tag_name": pos_label,
                             "level": level_str,

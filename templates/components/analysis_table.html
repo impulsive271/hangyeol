@@ -143,7 +143,7 @@
 
 <!-- [NEW] Selection Edit Modal -->
 <dialog id="selection-edit-modal">
-    <article style="min-width: 600px; max-width: 90vw; padding: 1rem;">
+    <article style="width: 100%; max-width: 1100px; min-width: 500px; padding: 1.5rem;">
         <header style="padding-bottom: 0.5rem;">
             <button aria-label="Close" rel="prev" onclick="closeSelectionEditModal()"></button>
             <h3 style="font-size: 1.1rem; margin: 0;">선택한 단어 수정하기</h3>
@@ -151,16 +151,16 @@
 
         <div style="max-height: 60vh; overflow-y: auto; margin: 0.5rem 0;">
             <table class="striped" id="selection-edit-table"
-                style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                style="width: 100%; border-collapse: collapse; font-size: 1.05rem;">
                 <thead>
                     <tr>
-                        <th style="padding: 6px 8px;">파일명</th>
-                        <th style="padding: 6px 8px;">표제어</th>
-                        <th style="padding: 6px 8px;">품사</th>
-                        <th style="padding: 6px 8px;">등급</th>
-                        <th style="padding: 6px 8px;">번호</th>
-                        <th style="padding: 6px 8px;">길잡이말</th>
-                        <th style="padding: 6px 12px; text-align: center; min-width: 80px;">수정</th>
+                        <th style="padding: 8px 10px; font-size: 1rem;">파일명</th>
+                        <th style="padding: 8px 10px; font-size: 1rem;">표제어</th>
+                        <th style="padding: 8px 10px; font-size: 1rem;">품사</th>
+                        <th style="padding: 8px 10px; font-size: 1rem;">등급</th>
+                        <th style="padding: 8px 10px; font-size: 1rem;">번호</th>
+                        <th style="padding: 8px 10px; font-size: 1rem;">길잡이말</th>
+                        <th style="padding: 8px 12px; text-align: center; min-width: 80px; font-size: 1rem;">수정</th>
                     </tr>
                 </thead>
                 <tbody id="selection-edit-tbody">
@@ -553,6 +553,8 @@
         </div>
         `;
 
+                // [NEW] Inject type for ID formatting
+                item.type = type;
                 div.onclick = () => applyEdit(item);
                 list.appendChild(div);
             });
@@ -620,6 +622,18 @@
             currentEditingRow.dataset.finalDesc = descText;
             currentEditingRow.dataset.finalTagCode = ""; // If available from item?
 
+            // [NEW] Save ID for confirmation
+            if (item.uid) {
+                const prefix = item.type === 'grammar' ? '문법' : '단어';
+                currentEditingRow.dataset.finalId = `${prefix}#${item.uid}`;
+            } else {
+                currentEditingRow.dataset.finalId = "수동교정";
+            }
+
+            // [MODAL CONTEXT] Update ID cell immediately
+            const modalIdCell = currentEditingRow.querySelector('.modal-cell-id');
+            if (modalIdCell) modalIdCell.innerText = currentEditingRow.dataset.finalId;
+
             closeEditModal();
             return; // STOP here. Do not update main table yet.
         }
@@ -638,7 +652,15 @@
         descCell.innerText = descText;
 
         const idCell = currentEditingRow.querySelector('.cell-id');
-        if (idCell) idCell.innerText = "수동교정";
+        if (idCell) {
+            // [MODIFIED] Real ID Display
+            if (item.uid) {
+                const prefix = item.type === 'grammar' ? '문법' : '단어';
+                idCell.innerText = `${prefix}#${item.uid}`;
+            } else {
+                idCell.innerText = "수동교정";
+            }
+        }
 
         // Refresh Full UI
         if (window.refreshGradeChart) window.refreshGradeChart();
@@ -707,14 +729,14 @@
             tr.className = 'modal-row';
 
             tr.innerHTML = `
-        <td style="padding:6px 8px; font-size:0.9rem; color:var(--color-primary);">${filename}</td>
-        <td class="modal-cell-form" style="padding:6px 8px; font-weight:bold;">${form}</td>
-        <td class="modal-cell-pos" style="padding:6px 8px;">${pos}</td>
-        <td class="modal-cell-grade" style="padding:6px 8px;">${grade}</td>
-        <td class="modal-cell-id" style="padding:6px 8px; font-size:0.85rem; color:#888;">${id}</td>
-        <td class="modal-cell-desc" style="padding:6px 8px; color:var(--color-secondary);">${desc}</td>
-        <td style="padding:6px 12px; text-align:center;">
-            <button class="btn-edit-row" style="opacity:1;" onclick="triggerEditFromModal('${originalUiId}')">✏️</button>
+        <td style="padding:8px 10px; font-size:1rem; color:var(--color-primary);">${filename}</td>
+        <td class="modal-cell-form" style="padding:8px 10px; font-weight:bold; font-size:1.1rem;">${form}</td>
+        <td class="modal-cell-pos" style="padding:8px 10px;">${pos}</td>
+        <td class="modal-cell-grade" style="padding:8px 10px;">${grade}</td>
+        <td class="modal-cell-id" style="padding:8px 10px; font-size:0.9rem; color:#888;">${id}</td>
+        <td class="modal-cell-desc" style="padding:8px 10px; color:var(--color-secondary); font-size:0.95rem;">${desc}</td>
+        <td style="padding:8px 12px; text-align:center;">
+            <button class="btn-edit-row" style="opacity:1; font-size:1.2rem;" onclick="triggerEditFromModal('${originalUiId}')">✏️</button>
         </td>
         `;
             tbody.appendChild(tr);
@@ -854,6 +876,7 @@
                 const newPos = row.dataset.finalPos;
                 const newGrade = row.dataset.finalGrade;
                 const newDesc = row.dataset.finalDesc;
+                const newId = row.dataset.finalId; // [NEW] Retrieve final ID
 
                 // If data exists (meaning it was edited), apply it
                 if (newForm) {
@@ -881,7 +904,11 @@
                     mainRow.querySelector('.cell-desc').innerText = newDesc;
 
                     // ID
-                    if (mainRow.querySelector('.cell-id')) mainRow.querySelector('.cell-id').innerText = "수동교정";
+                    if (newId && mainRow.querySelector('.cell-id')) {
+                        mainRow.querySelector('.cell-id').innerText = newId;
+                    } else if (mainRow.querySelector('.cell-id')) {
+                        mainRow.querySelector('.cell-id').innerText = "수동교정";
+                    }
 
                     // Update Visualization (Complex part)
                     // If merged: We need to merge spans. 'consumed children' are gone.
