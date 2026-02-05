@@ -39,7 +39,7 @@ class GenerationService:
 
         if keyword:
             hint_str = f" (문맥 힌트: {hint})" if hint and hint != 'nan' else ""
-            # [MODIFIED] Strip digits from keyword for prompt (e.g., '수도02' -> '수도')
+            # 프롬프트 입력을 위해 키워드 뒤의 숫자(예: '수도02' -> '수도')를 제거합니다.
             import re
             clean_keyword = re.sub(r'[0-9]+$', '', keyword)
             prompt += f"\n- 필수 포함 단어: '{clean_keyword}'{hint_str}\n  * 주의: 형태를 변형하지 말고 그대로 포함하세요.\n"

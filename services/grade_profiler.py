@@ -1,59 +1,15 @@
 import re
 import json
 from services.grade_database import GradeDatabase
+from services.ai_disambiguation_service import AIDisambiguationService
 
 class GradeProfiler:
     def __init__(self, data_service: GradeDatabase):
         self.data = data_service
+        self.ai_service = AIDisambiguationService()
         self.debug_lines = []
 
-    def _disambiguate_with_ai(self, client, model_name, sentence, ambiguous_items):
-        if not client or not ambiguous_items: return {}, "AI 미사용"
-        
-        prompt = f"""
-        당신은 한국어 어휘 분석 전문가입니다. 주어진 문맥을 바탕으로 동음이의어의 가장 적절한 의미를 판단하세요.
-        문맥: "{sentence}"
-        
-        [분석 대상 목록]
-        """
-        for i, item in enumerate(ambiguous_items):
-            # 0-Index를 1-Index로 변환하여 표시 (사용자/AI 친화적)
-            idx = i + 1
-            options = []
-            for cand in item['candidates']:
-                desc = cand.get('desc') or cand.get('meaning') or "의미 정보 없음"
-                options.append(f"(ID:{cand['uid']}) {desc}")
-            
-            options_str = ", ".join(options)
-            prompt += f"[{idx}] 단어: '{item['word']}' -> 후보: [{options_str}]\n"
-            
-        prompt += """
-        [출력 규칙]
-        1. 오직 JSON 형식으로만 응답하세요. (마크다운 코드 블록 ```json 사용 금지)
-        2. Key는 위 목록의 [번호]를 문자열로 사용하세요. (예: "1", "2")
-        3. Value는 선택한 ID 값(문자열)만 넣으세요.
-        4. 예시: {"1": "272", "2": "677"}
-        """
-        
-        raw_response = ""
-        try:
-            response = client.models.generate_content(
-                model=model_name,
-                contents=prompt,
-                config={"response_mime_type": "application/json"}
-            )
-            raw_response = response.text
-            
-            clean_json_str = raw_response.replace('```json', '').replace('```', '').strip()
-            if clean_json_str.endswith(',') or clean_json_str.endswith(',}'): 
-                 clean_json_str = clean_json_str.rstrip(',}') + "}"
-                 
-            ai_data = json.loads(clean_json_str)
-            return ai_data, raw_response
 
-        except Exception as e:
-            error_msg = f"Error: {e} | Raw: {raw_response}"
-            return {}, error_msg
 
     def profile(self, tokens, sentence, client=None, model_name=None):
         """
@@ -145,15 +101,15 @@ class GradeProfiler:
                 next_form = next_token.form if hasattr(next_token, 'form') else next_token['form']
                 next_tag = next_token.tag if hasattr(next_token, 'tag') else next_token['tag']
 
-                # [NEW Rule] 조사(J)가 포함되면 무조건 합치지 않음
+                # 1. 조사(J)가 포함되면 병합하지 않음
                 if tag.startswith('J') or next_tag.startswith('J'):
                     pass 
-                # [NEW Rule] 숫자/기호(clean_key가 빈 문자열)가 포함되면 병합하지 않음
+                # 2. 유효한 검색 키(clean_key)가 없으면(예: 기호, 숫자 등) 병합하지 않음
                 elif not form_clean or not self.data.clean_key(next_form):
                     pass
                 else:
                     combined_form = form_clean + self.data.clean_key(next_form)
-                    raw_combined_form = form + next_form # 시각화용 원본 보존
+                    raw_combined_form = form + next_form # 시각화용 원본 텍스트 보존
                     
                     # 병합 시도: (합친단어, 'N') 또는 (합친단어, 'V') 등으로 데이터 조회
                     # 우선순위: 명사(N) -> 동사(V) -> 기타
@@ -176,11 +132,10 @@ class GradeProfiler:
 
                         for key_var in lookup_keys:
 
-                            # [FIX logic] 
-                            # 1. 기능소+기능소 -> 명사 차단 (기존 로직 유지/보완)
-                            # 2. 용언(V)+어미(E) -> 명사 차단 (오인식 방지 강화)
-                            #    예: 하(VV) + 자(EF) -> 하자(N) (차단)
-                            #    예: 얼(VV) + 음(ETN) -> 얼음(N) (차단: 문맥상 동명사형일 수 있음)
+                            # 병합 규칙 개선:
+                            # 1. 기능소끼리의 결합은 명사로 오인식되지 않도록 차단
+                            # 2. 용언(V)과 어미(E)의 결합이 명사로 오인식되는 경우 차단 (예: 하자, 얼음)
+                            #    - 이는 용언 활용형이 동음이의어(명사)로 잘못 분석되는 것을 방지합니다.
                             
                             func_tags = {
                                 'XSN', 'XSV', 'XSA', 'XSA-I', 'XSV-I', 
@@ -205,8 +160,8 @@ class GradeProfiler:
                                 if is_pred_inflection:
                                     continue
 
-                            # [FIX] word_map과 grammar_map 모두 조회
-                            # '어지다' 같은 문법적 표현이나 동사는 grammar_map에 'V' 키로 있을 수 있음
+                            # 단어 사전과 문법 사전을 모두 조회하여 후보를 찾습니다.
+                            # ('어지다'와 같은 항목은 문법 사전에 'V'로 등록되어 있을 수 있습니다.)
                             candidates = []
                             if (key_var, p_key) in self.data.word_map:
                                 candidates.extend(self.data.word_map[(key_var, p_key)])
@@ -245,12 +200,9 @@ class GradeProfiler:
                                  if candidates:
                                      matched_candidate = candidates[0]
                                      matched_pos_type = 'V'
-                                     combined_form = combined_form_v # 폼 업데이트 (검색용 키)
-                                     # [FIX] 시각화용 원본은 '하다/되다' 등이 붙은 형태가 아니라 결합된 그대로여야 할 수도 있고, 
-                                     # 맥락상 '건강+하다'가 합쳐진 것이므로 raw_combined_form을 그대로 써도 됨.
-                                     # 단, combined_form이 '건강다'(X)가 아니라 '건강하다'(O)가 되도록 로직이 필요할 수 있으나,
-                                     # 여기서는 검색 성공 시 combined_form을 '건강하다'로 바꿨으므로(위 코드), 
-                                     # 시각화에는 2토큰의 원본 결합(raw_combined_form)을 쓰는 게 안전함.
+                                     combined_form = combined_form_v # 검색용 키 업데이트
+                                     # 시각화에는 '하다/되다'가 결합된 형태가 아닌, 실제 문장 내의 형태(raw_combined_form)를 사용해야 자연스럽습니다.
+                                     # 예를 들어 '건강+하다'가 합쳐져 '건강하다'로 인식되었더라도, 원문 표기는 그대로 유지합니다.
                                      merge_found = True
 
                     if merge_found and matched_candidate:
@@ -266,7 +218,7 @@ class GradeProfiler:
                         next_start = getattr(next_token, 'start', 0)
                         calc_len = (next_start + next_len) - t_start if next_start > 0 else 0
 
-                        # [NEW] 품사 명칭 동적 결정
+                        # 품사 명칭 동적 결정 (문법적 표현, 단어 품사 등)
                         pos_label = "복합어/파생어"
                         if 'class' in matched_candidate:
                             # 문법 DB 유래
@@ -278,7 +230,7 @@ class GradeProfiler:
                             pos_label = matched_candidate['raw_pos']
 
                         analysis_data.append({
-                            "form": raw_combined_form, # [FIX] 시각화엔 원본 형태 사용 (숫자 보존)
+                            "form": raw_combined_form, # 시각화용 원본 형태 사용 (원본 문자열 보존)
                             "tag_code": f"{tag}+{next_tag}",
                             "tag_name": pos_label,
                             "level": level_str,
@@ -292,7 +244,7 @@ class GradeProfiler:
             # 2. 단일 토큰 처리
             source_type = ""; search_key = ""; candidates = []
             pos_key = self.data.pos_map.get(tag, 'ETC')
-            # [FIX] 기본값 초기화
+            # 검색 대상 기본값 초기화
             target = form_clean 
 
             if tag in ['XSV', 'XSA'] and form_clean == '하':
@@ -351,7 +303,7 @@ class GradeProfiler:
 
         if ambiguous_items and client:
             self.debug_lines.append(f"🤖 AI 동음이의어 분석 시작 ({len(ambiguous_items)}건)...")
-            ai_decisions, raw_log = self._disambiguate_with_ai(client, model_name, sentence, ambiguous_items)
+            ai_decisions, raw_log = self.ai_service.disambiguate(client, model_name, sentence, ambiguous_items)
             
             for i, item in enumerate(ambiguous_items):
                 # Request Key: "1", "2"... (1-based Index)
